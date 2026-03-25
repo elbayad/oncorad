@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventaire RTLS - Oncorad</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: 'hsl(210, 100%, 60%)',
+                            dark: 'hsl(210, 100%, 40%)'
+                        },
+                        glass: 'rgba(255, 255, 255, 0.05)',
+                        'glass-border': 'rgba(255, 255, 255, 0.1)'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+            min-height: 100-screen;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.3);
+            background: rgba(30, 41, 59, 0.8);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .search-input:focus {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        }
+
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #60a5fa;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .asset-image {
+            object-fit: cover;
+            height: 200px;
+            width: 100%;
+            background: #1e293b;
+        }
+
+        .fallback-image {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body class="p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-12 text-center md:text-left">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 gradient-text">Inventaire Technique</h1>
+            <p class="text-slate-400 text-lg">Gestion et localisation en temps réel des équipements biomédicaux.</p>
+        </header>
+
+        <!-- Filters -->
+        <div
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 bg-slate-900/50 p-6 rounded-2xl border border-slate-800 backdrop-blur-md">
+            <!-- Search Name -->
+            <div class="relative">
+                <label class="block text-sm font-medium text-slate-400 mb-2">Nom / ID</label>
+                <input type="text" id="searchInput" placeholder="Rechercher..."
+                    class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 search-input transition-all text-sm">
+                <svg class="absolute right-4 top-10 w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+
+            <!-- Category Filter -->
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Catégorie</label>
+                <select id="categoryFilter"
+                    class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer text-sm">
+                    <option value="all">Toutes les catégories</option>
+                </select>
+            </div>
+
+            <!-- Floor Filter -->
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Étage</label>
+                <select id="floorFilter"
+                    class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer text-sm">
+                    <option value="all">Tous les étages</option>
+                </select>
+            </div>
+
+            <!-- Room Filter -->
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Salle / Room</label>
+                <select id="roomFilter"
+                    class="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer text-sm">
+                    <option value="all">Toutes les salles</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Inventory Grid -->
+        <div id="loaderContainer" class="flex justify-center items-center h-64">
+            <div class="loader"></div>
+        </div>
+
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-300">Résultats</h2>
+            <div class="text-sm">
+                <span id="assetCount" class="font-bold text-blue-400">0</span>
+                <span class="text-slate-500 ml-1">actifs</span>
+            </div>
+        </div>
+
+        <div id="inventoryGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 hidden">
+            <!-- Cards will be injected here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-20">
+            <svg class="mx-auto h-16 w-16 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <h3 class="text-xl font-medium text-slate-400">Aucun équipement trouvé</h3>
+            <p class="text-slate-600 mt-2">Essayez d'ajuster vos filtres de recherche.</p>
+        </div>
+    </div>
+
+    <script>
+        let allAssets = [];
+        let floorsMap = {};
+        let filterMetadata = { categories: [], floorRooms: [] };
+
+        async function init() {
+            try {
+                // Fetch floors
+                const floorsRes = await fetch('/api/public/floors');
+                const floorsJson = await floorsRes.json();
+                if (floorsJson.success) {
+                    const floorSelect = document.getElementById('floorFilter');
+                    floorsJson.data.forEach(floor => {
+                        const displayName = floor.name + (floor.description ? ' - ' + floor.description : '');
+                        floorsMap[floor.id] = displayName;
+                        const opt = document.createElement('option');
+                        opt.value = floor.id;
+                        opt.textContent = displayName;
+                        floorSelect.appendChild(opt);
+                    });
+                }
+
+                // Fetch metadata (Categories and Rooms)
+                const metaRes = await fetch('/api/public/filters');
+                const metaJson = await metaRes.json();
+                if (metaJson.success) {
+                    filterMetadata = metaJson.data;
+
+                    // Populate categories
+                    const catSelect = document.getElementById('categoryFilter');
+                    filterMetadata.categories.forEach(cat => {
+                        const opt = document.createElement('option');
+                        opt.value = cat;
+                        opt.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+                        catSelect.appendChild(opt);
+                    });
+
+                    // Initial Room population (All)
+                    updateRoomOptions('all');
+                }
+
+                // Fetch assets
+                const assetsRes = await fetch('/api/public/inventory');
+                const assetsJson = await assetsRes.json();
+
+                if (assetsJson.success) {
+                    allAssets = assetsJson.data;
+                    renderProducts(allAssets);
+                }
+
+                document.getElementById('loaderContainer').classList.add('hidden');
+                document.getElementById('inventoryGrid').classList.remove('hidden');
+
+            } catch (err) {
+                console.error("Initialization error:", err);
+                document.getElementById('loaderContainer').innerHTML = `<p class="text-red-400">Erreur lors du chargement des données. Veuillez réessayer.</p>`;
+            }
+        }
+
+        function updateRoomOptions(floorId) {
+            const roomSelect = document.getElementById('roomFilter');
+            roomSelect.innerHTML = '<option value="all">Toutes les salles</option>';
+
+            let rooms = [];
+            if (floorId === 'all') {
+                rooms = [...new Set(filterMetadata.floorRooms.map(r => r.room))].sort();
+            } else {
+                rooms = filterMetadata.floorRooms
+                    .filter(r => String(r.floor_id) === floorId)
+                    .map(r => r.room)
+                    .sort();
+            }
+
+            rooms.forEach(room => {
+                const opt = document.createElement('option');
+                opt.value = room;
+                opt.textContent = room;
+                roomSelect.appendChild(opt);
+            });
+        }
+
+        function renderProducts(assets) {
+            const grid = document.getElementById('inventoryGrid');
+            const emptyState = document.getElementById('emptyState');
+            const countLabel = document.getElementById('assetCount');
+
+            grid.innerHTML = '';
+            countLabel.textContent = assets.length;
+
+            if (assets.length === 0) {
+                grid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
+            assets.forEach(asset => {
+                const floorName = floorsMap[asset.floor_id] || `Étage ${asset.floor_id}`;
+                const date = new Date(asset.created_at).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                });
+
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-3xl overflow-hidden group';
+
+                const photoPath = `/photos/${asset.id}.jpg`;
+
+                card.innerHTML = `
+                    <div class="relative overflow-hidden">
+                        <img src="${photoPath}" 
+                             onerror="this.parentElement.innerHTML = '<div class=\\'fallback-image\\'><svg class=\\'w-12 h-12\\' fill=\\'none\\' stroke=\\'currentColor\\' viewBox=\\'0 0 24 24\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\'/></svg></div>'"
+                             class="asset-image group-hover:scale-105 transition-transform duration-500" 
+                             alt="${asset.name}">
+                        <div class="absolute top-4 right-4 bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-md border border-emerald-500/30">
+                            ${asset.category || 'Actif'}
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-2">
+                            <h2 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors uppercase truncate mr-2" title="${asset.name}">${asset.name}</h2>
+                            <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold whitespace-nowrap">ID: ${asset.id.substr(-6)}</span>
+                        </div>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex items-center text-slate-400 text-sm">
+                                <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                </svg>
+                                ${floorName}
+                            </div>
+                            <div class="flex items-center text-slate-400 text-sm">
+                                <svg class="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                ${asset.room || 'Salle non définie'}
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-700/50 flex justify-between items-center">
+                            <span class="text-[11px] text-slate-500 font-medium">Ajouté le ${date}</span>
+                            <button class="text-blue-400 hover:text-blue-300 text-sm font-semibold flex items-center transition-colors">
+                                Détails
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterAssets() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const floorFilter = document.getElementById('floorFilter').value;
+            const roomFilter = document.getElementById('roomFilter').value;
+
+            const filtered = allAssets.filter(asset => {
+                const matchesSearch =
+                    asset.name.toLowerCase().includes(searchTerm) ||
+                    asset.id.toLowerCase().includes(searchTerm);
+
+                const matchesCategory = categoryFilter === 'all' || asset.category === categoryFilter;
+                const matchesFloor = floorFilter === 'all' || String(asset.floor_id) === floorFilter;
+                const matchesRoom = roomFilter === 'all' || asset.room === roomFilter;
+
+                return matchesSearch && matchesCategory && matchesFloor && matchesRoom;
+            });
+
+            renderProducts(filtered);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', filterAssets);
+        document.getElementById('categoryFilter').addEventListener('change', filterAssets);
+        document.getElementById('floorFilter').addEventListener('change', (e) => {
+            updateRoomOptions(e.target.value);
+            filterAssets();
+        });
+        document.getElementById('roomFilter').addEventListener('change', filterAssets);
+
+        init();
+    </script>
+</body>
+
+</html>

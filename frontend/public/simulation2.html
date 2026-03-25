@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTLS BLE Simulation — Pédagogique</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        /* ─── Reset & Theme ─── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --red: #f85149;
+            --yellow: #d29922;
+            --purple: #bc8cff;
+            --orange: #f0883e;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            font-size: 13px;
+            overflow-x: hidden
+        }
+
+        h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        h2 {
+            font-size: .85rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 8px
+        }
+
+        h3 {
+            font-size: .78rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 4px
+        }
+
+        /* ─── Layout ─── */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface)
+        }
+
+        .header .badge {
+            background: var(--green);
+            color: #000;
+            font-size: .65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            animation: pulse 2s infinite
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .6
+            }
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            grid-template-rows: 1fr auto;
+            height: calc(100vh - 44px);
+            gap: 1px;
+            background: var(--border)
+        }
+
+        /* ─── Agent Panel ─── */
+        .agent-bar {
+            grid-column: 1 / -1;
+            background: var(--surface);
+            border-top: 2px solid var(--purple);
+            padding: 10px 16px;
+            display: grid;
+            grid-template-columns: 220px 1fr 1fr 1fr;
+            gap: 12px;
+            align-items: start;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .agent-bar h2 {
+            color: var(--purple);
+            margin-bottom: 6px
+        }
+
+        .agent-status {
+            font-size: .72rem
+        }
+
+        .agent-status .kv {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px
+        }
+
+        .agent-status .k {
+            color: var(--muted)
+        }
+
+        .agent-status .v {
+            font-weight: 600;
+            color: var(--text)
+        }
+
+        .agent-status .v.best {
+            color: var(--green)
+        }
+
+        .agent-status .v.trial {
+            color: var(--yellow)
+        }
+
+        .agent-status .v.idle {
+            color: var(--muted)
+        }
+
+        .agent-params-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 8px;
+            font-size: .68rem
+        }
+
+        .agent-params-grid .ap {
+            display: flex;
+            justify-content: space-between;
+            padding: 1px 4px;
+            border-radius: 2px
+        }
+
+        .agent-params-grid .ap.mutated {
+            background: rgba(210, 169, 34, .15);
+            color: var(--yellow)
+        }
+
+        .agent-params-grid .ap .apk {
+            color: var(--muted)
+        }
+
+        .agent-params-grid .ap .apv {
+            font-weight: 600
+        }
+
+        .agent-btn {
+            padding: 4px 12px;
+            border: 1px solid var(--purple);
+            background: transparent;
+            color: var(--purple);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: .72rem;
+            font-weight: 600;
+            transition: .2s
+        }
+
+        .agent-btn:hover {
+            background: var(--purple);
+            color: #000
+        }
+
+        .agent-btn.active {
+            background: var(--purple);
+            color: #000
+        }
+
+        .agent-chart-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px
+        }
+
+        .agent-chart-box canvas {
+            width: 100% !important;
+            height: 100px !important
+        }
+
+        .panel {
+            background: var(--surface);
+            overflow-y: auto;
+            padding: 12px
+        }
+
+        .panel::-webkit-scrollbar {
+            width: 4px
+        }
+
+        .panel::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px
+        }
+
+        /* ─── Controls ─── */
+        .ctrl-group {
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .ctrl-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px
+        }
+
+        .ctrl-row label {
+            color: var(--muted);
+            font-size: .75rem;
+            flex: 1
+        }
+
+        .ctrl-row .val {
+            color: var(--accent);
+            font-weight: 600;
+            min-width: 40px;
+            text-align: right;
+            font-size: .75rem
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+            outline: none;
+            margin: 4px 0
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid var(--surface)
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px
+        }
+
+        .toggle-row label {
+            font-size: .75rem;
+            color: var(--muted);
+            cursor: pointer
+        }
+
+        .switch {
+            position: relative;
+            width: 36px;
+            height: 18px
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0
+        }
+
+        .slider-toggle {
+            position: absolute;
+            inset: 0;
+            background: var(--border);
+            border-radius: 9px;
+            transition: .2s;
+            cursor: pointer
+        }
+
+        .slider-toggle:before {
+            content: '';
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--muted);
+            border-radius: 50%;
+            transition: .2s
+        }
+
+        .switch input:checked+.slider-toggle {
+            background: var(--accent)
+        }
+
+        .switch input:checked+.slider-toggle:before {
+            transform: translateX(18px);
+            background: #fff
+        }
+
+        /* ─── Canvas ─── */
+        .canvas-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0e14
+        }
+
+        canvas#floorplan {
+            display: block;
+            border-radius: 4px
+        }
+
+        /* ─── Status Panel ─── */
+        .status-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 8px
+        }
+
+        .status-card .kv {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px
+        }
+
+        .status-card .kv .k {
+            color: var(--muted);
+            font-size: .72rem
+        }
+
+        .status-card .kv .v {
+            font-weight: 600;
+            font-size: .72rem
+        }
+
+        .v.room {
+            color: var(--green)
+        }
+
+        .v.corridor {
+            color: var(--yellow)
+        }
+
+        .v.unknown {
+            color: var(--red)
+        }
+
+        .v.locked {
+            color: var(--green)
+        }
+
+        .v.unlocked {
+            color: var(--muted)
+        }
+
+        /* ─── RSSI Bars ─── */
+        .rssi-bar-wrap {
+            margin-bottom: 4px
+        }
+
+        .rssi-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: .68rem;
+            color: var(--muted);
+            margin-bottom: 1px
+        }
+
+        .rssi-bar-track {
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden
+        }
+
+        .rssi-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width .3s, background .3s
+        }
+
+        /* ─── Charts ─── */
+        .chart-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px;
+            margin-bottom: 8px
+        }
+
+        .chart-box canvas {
+            width: 100% !important;
+            height: 120px !important
+        }
+
+        /* ─── Scores Table ─── */
+        .score-table {
+            width: 100%;
+            font-size: .7rem;
+            border-collapse: collapse
+        }
+
+        .score-table th {
+            color: var(--muted);
+            text-align: left;
+            padding: 3px 4px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .score-table td {
+            padding: 3px 4px;
+            border-bottom: 1px solid rgba(48, 54, 61, .3)
+        }
+
+        .score-table tr.active {
+            background: rgba(63, 185, 80, .1)
+        }
+
+        .score-table .bar-cell {
+            width: 80px
+        }
+
+        .mini-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden
+        }
+
+        .mini-bar-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 2px;
+            transition: width .3s
+        }
+
+        /* ─── Tag Selector ─── */
+        .tag-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+            flex-wrap: wrap
+        }
+
+        .tag-tab {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: .7rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--muted);
+            transition: .2s
+        }
+
+        .tag-tab.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent)
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>🛰️ RTLS BLE Simulator</h1>
+        <span class="badge" id="tickBadge">LIVE</span>
+        <span style="color:var(--muted);font-size:.72rem;margin-left:auto" id="tickCounter">Tick #0 — 0.0s</span>
+    </div>
+
+    <div class="app">
+        <!-- ─── LEFT: Controls ─── -->
+        <div class="panel" id="controlPanel">
+            <h2>⚙️ Paramètres Physiques</h2>
+            <div class="ctrl-group">
+                <div class="ctrl-row"><label>Bruit σ (dB)</label><span class="val" id="vSigma">5</span></div>
+                <input type="range" id="sigma" min="0" max="20" step="0.5" value="5">
+                <div class="ctrl-row"><label>TX Power (dBm)</label><span class="val" id="vTx">-59</span></div>
+                <input type="range" id="txPower" min="-80" max="-40" step="1" value="-59">
+                <div class="ctrl-row"><label>Path Loss n</label><span class="val" id="vN">2.5</span></div>
+                <input type="range" id="pathLossN" min="1.5" max="5" step="0.1" value="2.5">
+            </div>
+
+            <h2>🔧 Algorithme</h2>
+            <div class="ctrl-group">
+                <div class="ctrl-row"><label>EMA Alpha</label><span class="val" id="vAlpha">0.33</span></div>
+                <input type="range" id="emaAlpha" min="0.05" max="1" step="0.01" value="0.33">
+                <div class="ctrl-row"><label>WCL Exponent</label><span class="val" id="vWclExp">2.5</span></div>
+                <input type="range" id="wclExponent" min="1" max="5" step="0.1" value="2.5">
+                <div class="ctrl-row"><label>Min RSSI Cutoff</label><span class="val" id="vMinRssi">-88</span></div>
+                <input type="range" id="minRssi" min="-100" max="-60" step="1" value="-88">
+                <div class="ctrl-row"><label>MA Window (fenêtres)</label><span class="val" id="vMaWindow">4</span></div>
+                <input type="range" id="maWindow" min="1" max="10" step="1" value="4">
+            </div>
+
+            <h2>🚪 Door & Semantic</h2>
+            <div class="ctrl-group">
+                <div class="ctrl-row"><label>Enter Evidence Min</label><span class="val" id="vEnterEv">0.70</span></div>
+                <input type="range" id="enterEvidenceMin" min="0.30" max="0.95" step="0.05" value="0.70">
+
+                <div class="ctrl-row"><label>Exit Evidence Min</label><span class="val" id="vExitEv">0.70</span></div>
+                <input type="range" id="exitEvidenceMin" min="0.30" max="0.95" step="0.05" value="0.70">
+
+                <div class="ctrl-row"><label>Enter Cycles</label><span class="val" id="vEnterCycles">4</span></div>
+                <input type="range" id="enterCycles" min="1" max="8" step="1" value="4">
+
+                <div class="ctrl-row"><label>Exit Cycles</label><span class="val" id="vExitCycles">8</span></div>
+                <input type="range" id="exitCycles" min="1" max="12" step="1" value="8">
+
+                <div class="ctrl-row"><label>Corridor Req</label><span class="val" id="vCorrReq">0.60</span></div>
+                <input type="range" id="corrEvidenceReq" min="0.20" max="0.90" step="0.05" value="0.60">
+
+                <div class="ctrl-row"><label>Safety Radius (m)</label><span class="val" id="vSafety">8.0</span></div>
+                <input type="range" id="safetyRadius" min="2" max="15" step="0.5" value="8.0">
+            </div>
+
+            <h2>🔀 Modules</h2>
+            <div class="ctrl-group">
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togSnap" checked><span
+                            class="slider-toggle"></span></label><label for="togSnap">Snap Centroïde</label></div>
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togCorridor" checked><span
+                            class="slider-toggle"></span></label><label for="togCorridor">Corridor Snap</label></div>
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togDoorGating" checked><span
+                            class="slider-toggle"></span></label><label for="togDoorGating">Door Gating</label></div>
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togHysteresis" checked><span
+                            class="slider-toggle"></span></label><label for="togHysteresis">Hystérésis</label></div>
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togEma" checked><span
+                            class="slider-toggle"></span></label><label for="togEma">EMA Smoothing</label></div>
+                <div class="toggle-row"><label class="switch"><input type="checkbox" id="togMA" checked><span
+                            class="slider-toggle"></span></label><label for="togMA">Moving Average</label></div>
+            </div>
+
+            <h2>⏱️ Simulation</h2>
+            <div class="ctrl-group">
+                <div class="ctrl-row"><label>Tick Interval (ms)</label><span class="val" id="vInterval">600</span></div>
+                <input type="range" id="tickInterval" min="100" max="2000" step="50" value="600">
+                <button onclick="sim.reset()"
+                    style="width:100%;padding:6px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;margin-top:6px">🔄
+                    Reset Simulation</button>
+            </div>
+        </div>
+
+        <!-- ─── CENTER: Canvas ─── -->
+        <div class="canvas-wrap">
+            <canvas id="floorplan"></canvas>
+        </div>
+
+        <!-- ─── RIGHT: Status & Charts ─── -->
+        <div class="panel" id="rightPanel">
+            <h2>🏷️ Tag Sélectionné</h2>
+            <div class="tag-tabs" id="tagTabs"></div>
+
+            <div class="status-card" id="statusCard">
+                <div class="kv"><span class="k">Mode Sémantique</span><span class="v" id="sSemMode"
+                        style="color:var(--purple)">UNKNOWN</span></div>
+                <div class="kv"><span class="k">Raison</span><span class="v" id="sSemReason"
+                        style="color:var(--accent)">—</span></div>
+                <div class="kv"><span class="k">Zone Détectée</span><span class="v room" id="sZone">—</span></div>
+                <div class="kv"><span class="k">Lock</span><span class="v unlocked" id="sLock">Unlocked</span></div>
+                <div class="kv"><span class="k">Erreur Position</span><span class="v" id="sError">— m</span></div>
+                <div class="kv"><span class="k">Confiance Mode</span><span class="v" id="sConf">—</span></div>
+                <div class="kv"><span class="k">Ancre Dominante</span><span class="v" id="sDominant">—</span></div>
+            </div>
+
+            <h2>📶 RSSI par Ancre</h2>
+            <div id="rssiBars"></div>
+
+            <h2 style="margin-top:12px">🏆 Scores par Room</h2>
+            <table class="score-table" id="scoreTable">
+                <thead>
+                    <tr>
+                        <th>Room</th>
+                        <th>Score</th>
+                        <th class="bar-cell">Rel.</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <h2 style="margin-top:12px">📈 RSSI vs Temps</h2>
+            <div class="chart-box"><canvas id="chartRssi"></canvas></div>
+
+            <h2>📊 Confiance & Erreur</h2>
+            <div class="chart-box"><canvas id="chartConf"></canvas></div>
+
+            <h2>📐 Erreur Distance (m)</h2>
+            <div class="chart-box"><canvas id="chartError"></canvas></div>
+        </div>
+
+        <!-- ─── BOTTOM: StabilityAgent ─── -->
+        <div class="agent-bar" id="agentBar">
+            <div>
+                <h2>🤖 StabilityAgent</h2>
+                <div style="display:flex;gap:4px;margin-bottom:8px">
+                    <button class="agent-btn" id="btnAgentToggle" onclick="sim.toggleAgent()">▶ Start</button>
+                    <button class="agent-btn" onclick="sim.resetAgent()">↺ Reset</button>
+                </div>
+                <div class="agent-status" id="agentStatus">
+                    <div class="kv"><span class="k">État</span><span class="v idle" id="agState">Idle</span></div>
+                    <div class="kv"><span class="k">Itération</span><span class="v" id="agIter">0</span></div>
+                    <div class="kv"><span class="k">Best Score</span><span class="v best" id="agBest">—</span></div>
+                    <div class="kv"><span class="k">Trial Score</span><span class="v trial" id="agTrial">—</span></div>
+                    <div class="kv"><span class="k">Accuracy</span><span class="v" id="agAcc">—</span></div>
+                    <div class="kv"><span class="k">Flips/min</span><span class="v" id="agFlips">—</span></div>
+                    <div class="kv"><span class="k">Avg Error</span><span class="v" id="agError">—</span></div>
+                    <div class="kv"><span class="k">Dernier Verdict</span><span class="v" id="agVerdict">—</span></div>
+                    <div class="kv"><span class="k">Param Muté</span><span class="v" id="agMutated">—</span></div>
+                    <div class="kv"><span class="k">Stage</span><span class="v" id="agStage"
+                            style="color:#d29922">—</span></div>
+                    <div class="kv"><span class="k">CrossBest</span><span class="v" id="agCrossBest"
+                            style="color:#bc8cff">—</span></div>
+                </div>
+            </div>
+            <div>
+                <h3 style="color:var(--purple);margin-bottom:4px">📊 Paramètres Actuels (Best)</h3>
+                <div class="agent-params-grid" id="agentParamsGrid"></div>
+            </div>
+            <div>
+                <h3 style="color:var(--purple);margin-bottom:4px">📈 Score & Accuracy</h3>
+                <div class="agent-chart-box"><canvas id="chartAgentScore"></canvas></div>
+            </div>
+            <div>
+                <h3 style="color:var(--purple);margin-bottom:4px">🔄 Flips/min & Error</h3>
+                <div class="agent-chart-box"><canvas id="chartAgentFlips"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ╔═══════════════════════════════════════════════════════════════╗
+        // ║                     RTLS BLE SIMULATOR                       ║
+        // ╚═══════════════════════════════════════════════════════════════╝
+
+        // ─── Utility ───
+        function gaussianNoise(sigma) {
+            let u = 0, v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        }
+
+        function pointInPolygon(px, py, poly) {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = poly[i][0], yi = poly[i][1];
+                const xj = poly[j][0], yj = poly[j][1];
+                if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+            }
+            return inside;
+        }
+
+        function distancePx(a, b) { return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2); }
+        function pxToMeters(px) { return px / 50; } // 50px = 1m
+        function metersToPx(m) { return m * 50; }
+
+        function nearestPointOnSegment(px, py, ax, ay, bx, by) {
+            const dx = bx - ax, dy = by - ay;
+            const lenSq = dx * dx + dy * dy;
+            if (lenSq === 0) return { x: ax, y: ay };
+            let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+            t = Math.max(0, Math.min(1, t));
+            return { x: ax + t * dx, y: ay + t * dy };
+        }
+
+        function snapToPolyline(px, py, segments) {
+            let bestDist = Infinity, bestPt = { x: px, y: py };
+            for (const seg of segments) {
+                const pt = nearestPointOnSegment(px, py, seg[0], seg[1], seg[2], seg[3]);
+                const d = Math.sqrt((px - pt.x) ** 2 + (py - pt.y) ** 2);
+                if (d < bestDist) { bestDist = d; bestPt = pt; }
+            }
+            return bestPt;
+        }
+
+        // ─── Colors ───
+        const COLORS = {
+            room: '#1a3a2a', roomStroke: '#3fb950', roomFill: 'rgba(63,185,80,0.08)',
+            corridor: '#1a2233', corrStroke: '#58a6ff', corrFill: 'rgba(88,166,255,0.06)',
+            anchorRoom: '#3fb950', anchorDoor: '#f0883e', anchorCorridor: '#58a6ff',
+            tagTrue: '#bc8cff', tagEst: '#f85149', tagLocked: '#3fb950',
+            text: '#8b949e', grid: '#21262d'
+        };
+
+        const ANCHOR_COLORS = ['#58a6ff', '#3fb950', '#f0883e', '#f85149', '#bc8cff', '#d29922', '#ff7b72', '#79c0ff', '#56d364', '#e3b341', '#ffa657', '#d2a8ff'];
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLASS: Anchor
+        // ═══════════════════════════════════════════════════════════════
+        class Anchor {
+            constructor(id, name, x, y, type, roomId = null) {
+                this.id = id;
+                this.name = name;
+                this.x = x; this.y = y;
+                this.type = type; // 'room' | 'door' | 'corridor'
+                this.roomId = roomId;
+                this.doorRoomId = type === 'door' ? roomId : null;
+                this.color = ANCHOR_COLORS[id % ANCHOR_COLORS.length];
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLASS: Tag
+        // ═══════════════════════════════════════════════════════════════
+        class Tag {
+            constructor(id, name, trueX, trueY, roomId) {
+                this.id = id;
+                this.name = name;
+                this.trueX = trueX; this.trueY = trueY;
+                this.roomId = roomId;
+                // State
+                this.estimatedX = trueX; this.estimatedY = trueY;
+                this.smoothedX = trueX; this.smoothedY = trueY;
+                this.rssiVector = {};
+                this.detectedZone = 'unknown';
+                this.detectedRoom = null;
+                this.method = '—';
+                this.roomLock = null;
+                this.confidence = 0;
+                this.dominantAnchor = null;
+                this.errorM = 0;
+                // History
+                this.rssiHistory = {}; // anchorId -> [values]
+                this.confHistory = [];
+                this.errorHistory = [];
+
+                // Semantic state (logic from rtlsService.js)
+                this.semantic = {
+                    mode: 'UNKNOWN',
+                    roomId: null,
+                    since: Date.now(),
+                    confidence: 0,
+                    candidateRoomId: null,
+                    candidateCount: 0,
+                    exitCount: 0,
+                    reason: 'init',
+                    lastStableRoomId: null,
+                    switchBlockUntil: 0
+                };
+
+                this.maBuffer = []; // array of rssiVector objects
+            }
+
+            generateRSSI(anchors, params) {
+                this.rssiVector = {};
+                for (const a of anchors) {
+                    const distM = pxToMeters(distancePx({ x: this.trueX, y: this.trueY }, a));
+                    const clampDist = Math.max(distM, 0.1); // avoid log(0)
+                    const rssi = params.txPower - 10 * params.pathLossN * Math.log10(clampDist) + gaussianNoise(params.sigma);
+                    this.rssiVector[a.id] = Math.round(rssi * 10) / 10;
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLASS: PositionEngine
+        // ═══════════════════════════════════════════════════════════════
+        class PositionEngine {
+            constructor(anchors, rooms, corridor, corridorLine) {
+                this.anchors = anchors;
+                this.rooms = rooms;
+                this.corridor = corridor; // polygon [[x,y],...]
+                this.corridorLine = corridorLine; // [[x1,y1,x2,y2], ...]
+                this.anchorRoomMap = new Map();
+                for (const a of anchors) {
+                    if (a.roomId !== null) this.anchorRoomMap.set(a.id, a.roomId);
+                }
+            }
+
+            calculateWCL(rssiVector, params) {
+                let sumW = 0, sumWX = 0, sumWY = 0;
+                for (const [aid, rssi] of Object.entries(rssiVector)) {
+                    if (rssi < params.minRssi) continue;
+                    const a = this.anchors.find(x => x.id === parseInt(aid));
+                    if (!a) continue;
+                    const base = rssi - params.minRssi;
+                    const w = Math.pow(base, params.wclExponent);
+                    sumW += w; sumWX += w * a.x; sumWY += w * a.y;
+                }
+                if (sumW === 0) return null;
+                return { x: sumWX / sumW, y: sumWY / sumW };
+            }
+
+            isInCorridor(x, y) {
+                return this.corridor && pointInPolygon(x, y, this.corridor);
+            }
+
+            _weightedMeanRSSI(anchors, vector) {
+                let sumW = 0, sumV = 0;
+                for (const a of anchors) {
+                    const rssi = vector[a.id];
+                    if (rssi === undefined) continue;
+                    const w = Math.pow(Math.max(0, rssi + 100), 2);
+                    sumW += w;
+                    sumV += w * rssi;
+                }
+                return sumW === 0 ? -100 : sumV / sumW;
+            }
+
+            getSemanticZoneEvidence(tag, vector, params) {
+                const evidence = {
+                    rooms: {}, // roomId -> { enterEvidence, exitEvidence }
+                    corridorScore: 0
+                };
+
+                let bestOutside = -100;
+                for (const [aid, rssi] of Object.entries(vector)) {
+                    bestOutside = Math.max(bestOutside, rssi);
+                }
+
+                for (const room of this.rooms) {
+                    const roomAnchors = this.anchors.filter(a => a.roomId === room.id);
+                    if (roomAnchors.length === 0) continue;
+
+                    const sRoom = this._weightedMeanRSSI(roomAnchors, vector);
+                    const exitEvidence = 1 / (1 + Math.exp(0.5 * (sRoom - (bestOutside - 2))));
+                    const enterEvidence = 1 / (1 + Math.exp(-0.4 * (sRoom - (-75))));
+
+                    evidence.rooms[room.id] = { enterEvidence, exitEvidence, sRoom };
+                }
+
+                const wclPos = this.calculateWCL(vector, params);
+                if (wclPos && this.isInCorridor(wclPos.x, wclPos.y)) {
+                    evidence.corridorScore = 0.8;
+                }
+
+                return evidence;
+            }
+
+            determineSemanticState(tag, evidence, params) {
+                const sem = tag.semantic;
+                const now = Date.now();
+
+                switch (sem.mode) {
+                    case 'UNKNOWN':
+                    case 'CORRIDOR':
+                        let bestRoomId = null, bestEnter = 0;
+                        for (const [rid, ev] of Object.entries(evidence.rooms)) {
+                            if (ev.enterEvidence > bestEnter) {
+                                bestEnter = ev.enterEvidence;
+                                bestRoomId = rid;
+                            }
+                        }
+                        if (bestRoomId && bestEnter >= params.enterEvidenceMin) {
+                            if (sem.candidateRoomId === bestRoomId) {
+                                sem.candidateCount++;
+                            } else {
+                                sem.candidateRoomId = bestRoomId;
+                                sem.candidateCount = 1;
+                            }
+                            sem.mode = 'ROOM_CANDIDATE';
+                            sem.reason = `candidate_${bestRoomId}_${sem.candidateCount}`;
+                        } else {
+                            sem.candidateCount = 0;
+                            if (evidence.corridorScore >= params.corrEvidenceReq) {
+                                sem.mode = 'CORRIDOR';
+                                sem.reason = 'in_corridor';
+                            } else {
+                                sem.mode = 'UNKNOWN';
+                                sem.reason = 'low_signal';
+                            }
+                        }
+                        break;
+
+                    case 'ROOM_CANDIDATE':
+                        const candEv = evidence.rooms[sem.candidateRoomId];
+                        if (candEv && candEv.enterEvidence >= params.enterEvidenceMin) {
+                            sem.candidateCount++;
+                            sem.reason = `candidate_${sem.candidateRoomId}_${sem.candidateCount}`;
+                            if (sem.candidateCount >= params.enterCycles) {
+                                sem.mode = 'IN_ROOM';
+                                sem.roomId = sem.candidateRoomId;
+                                sem.since = now;
+                                sem.exitCount = 0;
+                                sem.reason = 'entered_room';
+                            }
+                        } else {
+                            sem.mode = 'UNKNOWN';
+                            sem.candidateCount = 0;
+                        }
+                        break;
+
+                    case 'IN_ROOM':
+                        const roomEv = evidence.rooms[sem.roomId];
+                        if (!roomEv || roomEv.exitEvidence >= params.exitEvidenceMin) {
+                            sem.exitCount++;
+                            sem.reason = `exit_candidate_${sem.exitCount}`;
+                            if (sem.exitCount >= params.exitCycles) {
+                                sem.mode = 'EXIT_CANDIDATE';
+                            }
+                        } else {
+                            sem.exitCount = 0;
+                            sem.reason = 'stable_in_room';
+                        }
+                        const wcl = this.calculateWCL(tag.rssiVector, params);
+                        const roomObj = this.rooms.find(r => r.id === sem.roomId);
+                        if (wcl && roomObj) {
+                            const distM = pxToMeters(distancePx(wcl, { x: roomObj.cx, y: roomObj.cy }));
+                            if (distM > params.safetyRadiusM) {
+                                sem.mode = 'CORRIDOR';
+                                sem.roomId = null;
+                                sem.reason = 'safety_unlock_dist';
+                            }
+                        }
+                        break;
+
+                    case 'EXIT_CANDIDATE':
+                        const reEnterEv = evidence.rooms[sem.roomId];
+                        if (reEnterEv && reEnterEv.enterEvidence > 0.8) {
+                            sem.mode = 'IN_ROOM';
+                            sem.exitCount = 0;
+                            sem.reason = 'returned_to_room';
+                        } else if (evidence.corridorScore >= params.corrEvidenceReq) {
+                            sem.mode = 'CORRIDOR';
+                            sem.roomId = null;
+                            sem.reason = 'exit_confirmed_corridor';
+                        } else {
+                            sem.mode = 'UNKNOWN';
+                            sem.roomId = null;
+                            sem.reason = 'exit_confirmed_unknown';
+                        }
+                        break;
+                }
+            }
+
+            renderSemanticPosition(tag, vector, evidence, params) {
+                const sem = tag.semantic;
+                const wcl = this.calculateWCL(vector, params) || { x: tag.smoothedX, y: tag.smoothedY };
+                let finalPos = { x: wcl.x, y: wcl.y };
+
+                if (sem.mode === 'IN_ROOM' || sem.mode === 'EXIT_CANDIDATE') {
+                    const room = this.rooms.find(r => r.id === sem.roomId);
+                    if (room && params.snapCentroid) {
+                        finalPos = { x: room.cx, y: room.cy };
+                    }
+                } else if (sem.mode === 'CORRIDOR') {
+                    if (params.corridorSnap && this.corridorLine) {
+                        const snapped = snapToPolyline(wcl.x, wcl.y, this.corridorLine);
+                        finalPos = { x: snapped.x, y: snapped.y };
+                    }
+                } else {
+                    if (params.ema) {
+                        finalPos.x = tag.smoothedX * (1 - params.emaAlpha) + wcl.x * params.emaAlpha;
+                        finalPos.y = tag.smoothedY * (1 - params.emaAlpha) + wcl.y * params.emaAlpha;
+                    }
+                }
+
+                tag.smoothedX = finalPos.x;
+                tag.smoothedY = finalPos.y;
+                tag.estimatedX = wcl.x;
+                tag.estimatedY = wcl.y;
+
+                tag.detectedZone = sem.mode === 'IN_ROOM' || sem.mode === 'EXIT_CANDIDATE' ? (this.rooms.find(r => r.id === sem.roomId)?.name || sem.roomId) : (sem.mode === 'CORRIDOR' ? 'Corridor' : 'Unknown');
+                tag.roomLock = sem.mode === 'IN_ROOM' || sem.mode === 'EXIT_CANDIDATE' ? { roomId: sem.roomId } : null;
+                tag.confidence = (sem.mode === 'IN_ROOM' ? evidence.rooms[sem.roomId]?.enterEvidence : (sem.mode === 'CORRIDOR' ? evidence.corridorScore : 0)) || 0;
+            }
+
+            process(tag, params) {
+                const evidence = this.getSemanticZoneEvidence(tag, tag.rssiVector, params);
+                this.determineSemanticState(tag, evidence, params);
+                this.renderSemanticPosition(tag, tag.rssiVector, evidence, params);
+
+                let maxRssi = -Infinity, domId = null;
+                for (const [aid, r] of Object.entries(tag.rssiVector)) { if (r > maxRssi) { maxRssi = r; domId = aid; } }
+                tag.dominantAnchor = domId ? this.anchors.find(a => a.id === parseInt(domId)) : null;
+                tag.errorM = pxToMeters(distancePx({ x: tag.trueX, y: tag.trueY }, { x: tag.smoothedX, y: tag.smoothedY }));
+                tag.method = tag.semantic.reason;
+                tag._scores = Object.fromEntries(Object.entries(evidence.rooms).map(([rid, ev]) => [rid, ev.enterEvidence * 100]));
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLASS: RtlsSimulator
+        // ═══════════════════════════════════════════════════════════════
+        class RtlsSimulator {
+            constructor() {
+                this.canvas = document.getElementById('floorplan');
+                this.ctx = this.canvas.getContext('2d');
+                this.tickCount = 0;
+                this.selectedTagIdx = 0;
+                this.running = true;
+
+                // ─── Floor layout (px coords, 50px = 1m) ───
+                // Rooms: top row y=60..200, bottom row y=280..420, corridor y=200..280
+                const RW = 130, RH = 140, GAP = 15, Y_TOP = 50, Y_BOT = 290, CORR_Y1 = Y_TOP + RH, CORR_Y2 = Y_BOT;
+                const X0 = 40;
+
+                this.rooms = [
+                    { id: 'bloc1', name: 'Bloc1', x: X0, y: Y_TOP, w: RW, h: RH, cx: X0 + RW / 2, cy: Y_TOP + RH / 2 },
+                    { id: 'bloc2', name: 'Bloc2', x: X0 + RW + GAP, y: Y_TOP, w: RW, h: RH, cx: X0 + RW + GAP + RW / 2, cy: Y_TOP + RH / 2 },
+                    { id: 'bloc3', name: 'Bloc3', x: X0 + 2 * (RW + GAP), y: Y_TOP, w: RW, h: RH, cx: X0 + 2 * (RW + GAP) + RW / 2, cy: Y_TOP + RH / 2 },
+                    { id: 'sdr', name: 'Salle Réveil', x: X0 + 3 * (RW + GAP), y: Y_TOP, w: RW, h: RH, cx: X0 + 3 * (RW + GAP) + RW / 2, cy: Y_TOP + RH / 2 },
+                    { id: 'bloc4', name: 'Bloc4', x: X0, y: Y_BOT, w: RW, h: RH, cx: X0 + RW / 2, cy: Y_BOT + RH / 2 },
+                    { id: 'bloc5', name: 'Bloc5', x: X0 + RW + GAP, y: Y_BOT, w: RW, h: RH, cx: X0 + RW + GAP + RW / 2, cy: Y_BOT + RH / 2 },
+                    { id: 'bloc6', name: 'Bloc6', x: X0 + 2 * (RW + GAP), y: Y_BOT, w: RW, h: RH, cx: X0 + 2 * (RW + GAP) + RW / 2, cy: Y_BOT + RH / 2 },
+                ];
+
+                // Build polygons
+                for (const r of this.rooms) {
+                    r.polygon = [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]];
+                }
+
+                // Corridor
+                const corrRight = X0 + 4 * (RW + GAP);
+                this.corridorPoly = [[X0 - 10, CORR_Y1], [corrRight, CORR_Y1], [corrRight, CORR_Y2], [X0 - 10, CORR_Y2]];
+                const corrCenterY = (CORR_Y1 + CORR_Y2) / 2;
+                this.corridorLine = [[X0 - 10, corrCenterY, corrRight, corrCenterY]];
+
+                // ─── Anchors ───
+                this.anchors = [];
+                let aid = 0;
+                for (const r of this.rooms) {
+                    // Internal anchor at room center
+                    this.anchors.push(new Anchor(aid++, `A-${r.name}`, r.cx, r.cy, 'room', r.id));
+                    // Door anchor at room edge facing corridor
+                    const doorY = r.y < 200 ? r.y + r.h : r.y;
+                    this.anchors.push(new Anchor(aid++, `D-${r.name}`, r.cx, doorY, 'door', r.id));
+                }
+                // Corridor anchors
+                const corrAnchorsX = [X0 + 30, X0 + RW + GAP / 2 + RW / 2, X0 + 2 * (RW + GAP) + RW / 2, corrRight - 40];
+                for (const cx of corrAnchorsX) {
+                    this.anchors.push(new Anchor(aid++, `C-${aid}`, cx, corrCenterY, 'corridor', null));
+                }
+
+                // ─── Tags (fixed in rooms) ───
+                this.tags = this.rooms.map((r, i) => new Tag(i, r.name, r.cx, r.cy, r.id));
+
+                // ─── Engine ───
+                this.engine = new PositionEngine(this.anchors, this.rooms, this.corridorPoly, this.corridorLine);
+
+                // ─── Canvas sizing ───
+                this.W = corrRight + 40;
+                this.H = Y_BOT + RH + 40;
+                this.canvas.width = this.W;
+                this.canvas.height = this.H;
+
+                // ─── Charts ───
+                this.initCharts();
+                this.initUI();
+                this.bindControls();
+
+                // ─── Start ───
+                this.scheduleNextTick();
+            }
+
+            getParams() {
+                return {
+                    sigma: parseFloat(document.getElementById('sigma').value),
+                    txPower: parseFloat(document.getElementById('txPower').value),
+                    pathLossN: parseFloat(document.getElementById('pathLossN').value),
+                    emaAlpha: parseFloat(document.getElementById('emaAlpha').value),
+                    wclExponent: parseFloat(document.getElementById('wclExponent').value),
+                    minRssi: parseFloat(document.getElementById('minRssi').value),
+                    enterEvidenceMin: parseFloat(document.getElementById('enterEvidenceMin').value),
+                    exitEvidenceMin: parseFloat(document.getElementById('exitEvidenceMin').value),
+                    enterCycles: parseInt(document.getElementById('enterCycles').value, 10),
+                    exitCycles: parseInt(document.getElementById('exitCycles').value, 10),
+                    corrEvidenceReq: parseFloat(document.getElementById('corrEvidenceReq').value),
+                    safetyRadiusM: parseFloat(document.getElementById('safetyRadius').value),
+                    snapCentroid: document.getElementById('togSnap').checked,
+                    corridorSnap: document.getElementById('togCorridor').checked,
+                    doorGating: document.getElementById('togDoorGating').checked,
+                    hysteresis: document.getElementById('togHysteresis').checked,
+                    ema: document.getElementById('togEma').checked,
+                    ma: document.getElementById('togMA').checked,
+                    maWindow: parseInt(document.getElementById('maWindow').value, 10),
+                };
+            }
+
+            scheduleNextTick() {
+                const interval = parseInt(document.getElementById('tickInterval').value);
+                this._timer = setTimeout(() => {
+                    if (this.running) this.tick();
+                    this.scheduleNextTick();
+                }, interval);
+            }
+
+            tick() {
+                this.tickCount++;
+                const params = this.getParams();
+
+                // 1. Generate RSSI for all tags
+                for (const tag of this.tags) {
+                    tag.generateRSSI(this.anchors, params);
+                }
+
+                // 1b. Moving Average filter (smooth over N ticks)
+                if (params.ma && params.maWindow > 1) {
+                    for (const tag of this.tags) {
+                        tag.maBuffer.push({ ...tag.rssiVector });
+                        if (tag.maBuffer.length > params.maWindow) tag.maBuffer.shift();
+                        // Average per anchor across the buffer
+                        const summed = {}, counts = {};
+                        for (const vec of tag.maBuffer) {
+                            for (const [aid, rssi] of Object.entries(vec)) {
+                                summed[aid] = (summed[aid] || 0) + rssi;
+                                counts[aid] = (counts[aid] || 0) + 1;
+                            }
+                        }
+                        const averaged = {};
+                        for (const aid of Object.keys(summed)) {
+                            averaged[aid] = summed[aid] / counts[aid];
+                        }
+                        tag.rssiVector = averaged;
+                    }
+                }
+
+                // 2. Process positioning
+                for (const tag of this.tags) {
+                    this.engine.process(tag, params);
+                }
+
+                // 3. Update histories
+                const sel = this.tags[this.selectedTagIdx];
+                for (const a of this.anchors) {
+                    if (!sel.rssiHistory[a.id]) sel.rssiHistory[a.id] = [];
+                    sel.rssiHistory[a.id].push(sel.rssiVector[a.id] || -100);
+                    if (sel.rssiHistory[a.id].length > 60) sel.rssiHistory[a.id].shift();
+                }
+                sel.confHistory.push(sel.confidence);
+                if (sel.confHistory.length > 60) sel.confHistory.shift();
+                sel.errorHistory.push(sel.errorM);
+                if (sel.errorHistory.length > 60) sel.errorHistory.shift();
+
+                // 4. Render
+                this.render();
+                this.updateUI(sel);
+                this.updateCharts(sel);
+
+                document.getElementById('tickCounter').textContent = `Tick #${this.tickCount} — ${(this.tickCount * parseInt(document.getElementById('tickInterval').value) / 1000).toFixed(1)}s`;
+            }
+
+            reset() {
+                this.tickCount = 0;
+                for (const tag of this.tags) {
+                    tag.smoothedX = tag.trueX; tag.smoothedY = tag.trueY;
+                    tag.estimatedX = tag.trueX; tag.estimatedY = tag.trueY;
+                    tag.roomLock = null;
+                    tag.detectedZone = 'unknown';
+                    tag.rssiHistory = {}; tag.confHistory = []; tag.errorHistory = [];
+                    tag.maBuffer = [];
+                }
+            }
+
+            // ─── Rendering ───
+            render() {
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.W, this.H);
+
+                // Grid
+                ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+                for (let x = 0; x < this.W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.H); ctx.stroke(); }
+                for (let y = 0; y < this.H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.W, y); ctx.stroke(); }
+
+                // Corridor
+                ctx.fillStyle = COLORS.corrFill; ctx.strokeStyle = COLORS.corrStroke; ctx.lineWidth = 1;
+                ctx.beginPath();
+                this.corridorPoly.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                // Corridor centerline
+                ctx.strokeStyle = 'rgba(88,166,255,0.3)'; ctx.setLineDash([6, 4]);
+                ctx.beginPath(); ctx.moveTo(this.corridorLine[0][0], this.corridorLine[0][1]); ctx.lineTo(this.corridorLine[0][2], this.corridorLine[0][3]); ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Rooms
+                for (const r of this.rooms) {
+                    ctx.fillStyle = COLORS.roomFill; ctx.strokeStyle = COLORS.roomStroke; ctx.lineWidth = 1.5;
+                    ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x, r.y, r.w, r.h);
+                    // Label
+                    ctx.fillStyle = COLORS.text; ctx.font = 'bold 11px Inter, sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText(r.name, r.cx, r.y + 16);
+                    // Centroid cross
+                    ctx.strokeStyle = 'rgba(63,185,80,0.3)'; ctx.lineWidth = 0.5;
+                    ctx.beginPath(); ctx.moveTo(r.cx - 6, r.cy); ctx.lineTo(r.cx + 6, r.cy); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(r.cx, r.cy - 6); ctx.lineTo(r.cx, r.cy + 6); ctx.stroke();
+                }
+
+                // Anchors
+                for (const a of this.anchors) {
+                    const color = a.type === 'room' ? COLORS.anchorRoom : a.type === 'door' ? COLORS.anchorDoor : COLORS.anchorCorridor;
+                    ctx.fillStyle = color;
+                    if (a.type === 'door') {
+                        // Diamond
+                        ctx.beginPath(); ctx.moveTo(a.x, a.y - 5); ctx.lineTo(a.x + 5, a.y); ctx.lineTo(a.x, a.y + 5); ctx.lineTo(a.x - 5, a.y); ctx.closePath(); ctx.fill();
+                    } else {
+                        ctx.beginPath(); ctx.arc(a.x, a.y, 4, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.fillStyle = COLORS.text; ctx.font = '8px Inter, sans-serif'; ctx.textAlign = 'left';
+                    ctx.fillText(a.name, a.x + 7, a.y + 3);
+                }
+
+                // Tags
+                for (let i = 0; i < this.tags.length; i++) {
+                    const t = this.tags[i];
+                    const isSel = i === this.selectedTagIdx;
+
+                    // True position (hollow circle)
+                    ctx.strokeStyle = COLORS.tagTrue; ctx.lineWidth = isSel ? 2 : 1;
+                    ctx.beginPath(); ctx.arc(t.trueX, t.trueY, isSel ? 8 : 5, 0, Math.PI * 2); ctx.stroke();
+
+                    // Estimated position
+                    const estColor = t.roomLock ? COLORS.tagLocked : COLORS.tagEst;
+                    ctx.fillStyle = estColor;
+                    ctx.beginPath(); ctx.arc(t.smoothedX, t.smoothedY, isSel ? 6 : 3, 0, Math.PI * 2); ctx.fill();
+
+                    // Error line
+                    if (isSel) {
+                        ctx.strokeStyle = 'rgba(248,81,73,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+                        ctx.beginPath(); ctx.moveTo(t.trueX, t.trueY); ctx.lineTo(t.smoothedX, t.smoothedY); ctx.stroke();
+                        ctx.setLineDash([]);
+                        // Error distance label
+                        ctx.fillStyle = COLORS.tagEst; ctx.font = 'bold 10px Inter, sans-serif'; ctx.textAlign = 'center';
+                        const midX = (t.trueX + t.smoothedX) / 2, midY = (t.trueY + t.smoothedY) / 2;
+                        if (t.errorM > 0.2) ctx.fillText(`${t.errorM.toFixed(1)}m`, midX, midY - 6);
+                    }
+                }
+
+                // Legend
+                const lx = this.W - 130, ly = this.H - 60;
+                ctx.font = '9px Inter, sans-serif'; ctx.textAlign = 'left';
+                ctx.strokeStyle = COLORS.tagTrue; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = COLORS.text; ctx.fillText('Position Réelle', lx + 10, ly + 3);
+                ctx.fillStyle = COLORS.tagEst; ctx.beginPath(); ctx.arc(lx, ly + 14, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = COLORS.text; ctx.fillText('Position Estimée', lx + 10, ly + 17);
+                ctx.fillStyle = COLORS.tagLocked; ctx.beginPath(); ctx.arc(lx, ly + 28, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = COLORS.text; ctx.fillText('Locked (Snap)', lx + 10, ly + 31);
+            }
+
+            // ─── UI Updates ───
+            initUI() {
+                const tabs = document.getElementById('tagTabs');
+                this.tags.forEach((t, i) => {
+                    const el = document.createElement('span');
+                    el.className = 'tag-tab' + (i === 0 ? ' active' : '');
+                    el.textContent = t.name;
+                    el.onclick = () => {
+                        this.selectedTagIdx = i;
+                        tabs.querySelectorAll('.tag-tab').forEach(tt => tt.classList.remove('active'));
+                        el.classList.add('active');
+                        // Reset chart history for new tag
+                    };
+                    tabs.appendChild(el);
+                });
+            }
+
+            updateUI(tag) {
+                const sem = tag.semantic || { mode: 'UNKNOWN', reason: '—' };
+                document.getElementById('sSemMode').textContent = sem.mode;
+                document.getElementById('sSemReason').textContent = sem.reason;
+
+                const zoneEl = document.getElementById('sZone');
+                zoneEl.textContent = tag.detectedZone;
+                zoneEl.className = 'v ' + (tag.detectedZone === 'Corridor' ? 'corridor' : tag.detectedZone === 'Unknown' ? 'unknown' : 'room');
+
+                const lockEl = document.getElementById('sLock');
+                lockEl.textContent = tag.roomLock ? `🔒 ${tag.detectedZone}` : 'Unlocked';
+                lockEl.className = 'v ' + (tag.roomLock ? 'locked' : 'unlocked');
+                document.getElementById('sError').textContent = `${tag.errorM.toFixed(2)} m`;
+                document.getElementById('sConf').textContent = `${(tag.confidence * 100).toFixed(0)}%`;
+                document.getElementById('sDominant').textContent = tag.dominantAnchor ? `${tag.dominantAnchor.name} (${tag.rssiVector[tag.dominantAnchor.id]?.toFixed(0)} dBm)` : '—';
+
+                // RSSI Bars
+                const barsDiv = document.getElementById('rssiBars');
+                barsDiv.innerHTML = '';
+                const sortedAnchors = [...this.anchors].sort((a, b) => (tag.rssiVector[b.id] || -100) - (tag.rssiVector[a.id] || -100));
+                for (const a of sortedAnchors) {
+                    const rssi = tag.rssiVector[a.id] || -100;
+                    const pct = Math.max(0, Math.min(100, ((rssi + 100) / 60) * 100));
+                    const hue = pct > 60 ? 120 : pct > 30 ? 40 : 0;
+                    barsDiv.innerHTML += `
+        <div class="rssi-bar-wrap">
+          <div class="rssi-bar-label"><span>${a.name} (${a.type})</span><span>${rssi.toFixed(0)} dBm</span></div>
+          <div class="rssi-bar-track"><div class="rssi-bar-fill" style="width:${pct}%;background:hsl(${hue},70%,50%)"></div></div>
+        </div>`;
+                }
+
+                // Scores Table
+                const tbody = document.querySelector('#scoreTable tbody');
+                tbody.innerHTML = '';
+                const scores = tag._scores || {};
+                const maxScore = Math.max(1, ...Object.values(scores));
+                const sortedScores = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+                for (const [rid, score] of sortedScores) {
+                    const room = this.rooms.find(r => r.id === rid);
+                    const isActive = tag.roomLock && tag.roomLock.roomId === rid;
+                    const pct = (score / maxScore * 100).toFixed(0);
+                    tbody.innerHTML += `<tr class="${isActive ? 'active' : ''}"><td>${room?.name || rid}</td><td>${score.toFixed(0)}</td><td class="bar-cell"><div class="mini-bar"><div class="mini-bar-fill" style="width:${pct}%"></div></div></td></tr>`;
+                }
+            }
+
+            // ─── Charts ───
+            initCharts() {
+                const defaults = { responsive: true, animation: false, scales: { x: { display: false }, y: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { color: '#21262d' } } }, plugins: { legend: { labels: { color: '#8b949e', font: { size: 9 }, boxWidth: 10 } } } };
+
+                this.chartRssi = new Chart(document.getElementById('chartRssi'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, title: { display: true, text: 'dBm', color: '#8b949e', font: { size: 9 } } } } }
+                });
+
+                this.chartConf = new Chart(document.getElementById('chartConf'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Confiance', data: [], borderColor: '#3fb950', borderWidth: 1.5, pointRadius: 0, fill: true, backgroundColor: 'rgba(63,185,80,0.1)' }] },
+                    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, min: 0, max: 1 } } }
+                });
+
+                this.chartError = new Chart(document.getElementById('chartError'), {
+                    type: 'line',
+                    data: { labels: [], datasets: [{ label: 'Erreur (m)', data: [], borderColor: '#f85149', borderWidth: 1.5, pointRadius: 0, fill: true, backgroundColor: 'rgba(248,81,73,0.1)' }] },
+                    options: { ...defaults, scales: { ...defaults.scales, y: { ...defaults.scales.y, min: 0 } } }
+                });
+            }
+
+            updateCharts(tag) {
+                const labels = Array.from({ length: tag.confHistory.length }, (_, i) => i);
+
+                // RSSI chart — show top 5 anchors by average RSSI
+                const avgRssi = {};
+                for (const a of this.anchors) {
+                    const hist = tag.rssiHistory[a.id];
+                    if (hist && hist.length > 0) avgRssi[a.id] = hist.reduce((s, v) => s + v, 0) / hist.length;
+                }
+                const top5 = Object.entries(avgRssi).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+                this.chartRssi.data.labels = labels;
+                this.chartRssi.data.datasets = top5.map(([aid]) => {
+                    const a = this.anchors.find(x => x.id === parseInt(aid));
+                    return {
+                        label: a?.name || aid,
+                        data: tag.rssiHistory[aid] || [],
+                        borderColor: a?.color || '#58a6ff',
+                        borderWidth: 1.2,
+                        pointRadius: 0,
+                        tension: 0.3,
+                    };
+                });
+                this.chartRssi.update('none');
+
+                // Confidence
+                this.chartConf.data.labels = labels;
+                this.chartConf.data.datasets[0].data = tag.confHistory;
+                this.chartConf.update('none');
+
+                // Error
+                this.chartError.data.labels = labels;
+                this.chartError.data.datasets[0].data = tag.errorHistory;
+                this.chartError.update('none');
+            }
+
+            // ─── Controls Binding ───
+            bindControls() {
+                const sliders = [
+                    ['sigma', 'vSigma'], ['txPower', 'vTx'], ['pathLossN', 'vN'],
+                    ['emaAlpha', 'vAlpha'], ['wclExponent', 'vWclExp'], ['minRssi', 'vMinRssi'],
+                    ['enterEvidenceMin', 'vEnterEv'], ['exitEvidenceMin', 'vExitEv'],
+                    ['enterCycles', 'vEnterCycles'], ['exitCycles', 'vExitCycles'],
+                    ['corrEvidenceReq', 'vCorrReq'], ['safetyRadius', 'vSafety'],
+                    ['tickInterval', 'vInterval'], ['maWindow', 'vMaWindow']
+                ];
+                for (const [sid, vid] of sliders) {
+                    const el = document.getElementById(sid);
+                    el.addEventListener('input', () => { document.getElementById(vid).textContent = el.value; });
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLASS: StabilityAgent — Stochastic Hill-Climbing
+        // ═══════════════════════════════════════════════════════════════
+        class StabilityAgent {
+            constructor(simulator) {
+                this.sim = simulator;
+                this.active = false;
+                this.iteration = 0;
+                this.trialTicks = 0;
+                this.TRIAL_DURATION = 16; // ~10s at 600ms ticks
+                this.EVAL_DURATION = this.TRIAL_DURATION;
+                this.MAX_STAGE_BUDGET = 500; // budget max d'itérations par stage
+
+                // ─── Staged Sigma Training ───
+                this.stages = [
+                    { sigma: 4, iters: 50 },
+                    { sigma: 8, iters: 100 },
+                    { sigma: 10, iters: 100 }
+                ];
+                this.stageIndex = 0;
+                this.stageIter = 0;
+
+                // ─── Cross-sigma state ───
+                this.crossBestParams = null;
+                this.crossBestScore = -Infinity;
+                this.evalState = null; // {active, sigmas, idx, ticks, window, results, savedSigma, savedParams, callback}
+
+                // Tunable parameter space with ranges and step sizes
+                this.paramSpace = {
+                    emaAlpha: { min: 0.05, max: 1.0, step: 0.05, slider: 'emaAlpha', display: 'vAlpha' },
+                    enterEvidenceMin: { min: 0.3, max: 0.95, step: 0.05, slider: 'enterEvidenceMin', display: 'vEnterEv' },
+                    exitEvidenceMin: { min: 0.3, max: 0.95, step: 0.05, slider: 'exitEvidenceMin', display: 'vExitEv' },
+                    enterCycles: { min: 1, max: 8, step: 1, slider: 'enterCycles', display: 'vEnterCycles' },
+                    exitCycles: { min: 1, max: 12, step: 1, slider: 'exitCycles', display: 'vExitCycles' },
+                    corrEvidenceReq: { min: 0.2, max: 0.9, step: 0.05, slider: 'corrEvidenceReq', display: 'vCorrReq' },
+                    safetyRadiusM: { min: 2, max: 15, step: 0.5, slider: 'safetyRadius', display: 'vSafety' },
+                    wclExponent: { min: 1.0, max: 5.0, step: 0.2, slider: 'wclExponent', display: 'vWclExp' },
+                    minRssi: { min: -100, max: -60, step: 2, slider: 'minRssi', display: 'vMinRssi' },
+                };
+
+                // Best known configuration (per-stage local best)
+                this.bestParams = this.readCurrentParams();
+                this.bestScore = -Infinity;
+                this.trialParams = null;
+                this.mutatedKey = null;
+                this.lastVerdict = '—';
+
+                // Sliding window metrics
+                this.window = []; // {correct, flipped, error, corridorFP} per tick
+
+                // History for charts
+                this.scoreHistory = [];
+                this.accuracyHistory = [];
+                this.flipsHistory = [];
+                this.errorHistory = [];
+                this.MAX_HISTORY = 80;
+
+                this.initCharts();
+            }
+
+            // ─── Sigma helpers ───
+            setSigma(value) {
+                const el = document.getElementById('sigma');
+                el.value = value;
+                document.getElementById('vSigma').textContent = value;
+            }
+
+            getSigma() {
+                return parseFloat(document.getElementById('sigma').value);
+            }
+
+            readCurrentParams() {
+                const p = {};
+                for (const [key, spec] of Object.entries(this.paramSpace)) {
+                    p[key] = parseFloat(document.getElementById(spec.slider).value);
+                }
+                return p;
+            }
+
+            applyParams(params) {
+                for (const [key, val] of Object.entries(params)) {
+                    const spec = this.paramSpace[key];
+                    const el = document.getElementById(spec.slider);
+                    el.value = val;
+                    document.getElementById(spec.display).textContent = val;
+                }
+            }
+
+            mutate(params) {
+                const keys = Object.keys(this.paramSpace);
+                const key = keys[Math.floor(Math.random() * keys.length)];
+                const spec = this.paramSpace[key];
+                const newParams = { ...params };
+                const direction = Math.random() < 0.5 ? -1 : 1;
+                const magnitude = spec.step * (1 + Math.floor(Math.random() * 3)); // 1x–3x step
+                let val = params[key] + direction * magnitude;
+                val = Math.max(spec.min, Math.min(spec.max, val));
+                // Round to step precision
+                val = Math.round(val / spec.step) * spec.step;
+                val = parseFloat(val.toFixed(4));
+                newParams[key] = val;
+                return { params: newParams, mutatedKey: key, oldVal: params[key], newVal: val };
+            }
+
+            // Collect per-tick metrics across ALL tags
+            collectTickMetrics() {
+                let correct = 0, total = 0, flipped = 0, errorSum = 0, corridorFP = 0;
+                for (const tag of this.sim.tags) {
+                    total++;
+                    // Correct = detected zone matches true room
+                    if (tag.detectedRoom && tag.detectedRoom.id === tag.roomId) correct++;
+                    // Corridor false positive (tag is in a room but detected as corridor)
+                    if (tag.detectedZone === 'Corridor' && tag.roomId) corridorFP++;
+                    // Error distance
+                    errorSum += tag.errorM;
+                    // Flip detection
+                    if (!tag._prevZone) tag._prevZone = tag.detectedZone;
+                    if (tag.detectedZone !== tag._prevZone) { flipped++; tag._prevZone = tag.detectedZone; }
+                }
+                return { correct, total, flipped, errorSum: errorSum / Math.max(1, total), corridorFP };
+            }
+
+            // Compute composite score over a given window
+            computeScoreForWindow(win) {
+                if (win.length === 0) return { score: 0, accuracy: 0, flipsPerMin: 0, avgError: 0 };
+                const n = win.length;
+                let totalCorrect = 0, totalTotal = 0, totalFlips = 0, totalError = 0, totalCorrFP = 0;
+                for (const w of win) {
+                    totalCorrect += w.correct;
+                    totalTotal += w.total;
+                    totalFlips += w.flipped;
+                    totalError += w.errorSum;
+                    totalCorrFP += w.corridorFP;
+                }
+                const accuracy = totalTotal > 0 ? totalCorrect / totalTotal : 0;
+                const avgError = totalError / n;
+                const intervalSec = parseInt(document.getElementById('tickInterval').value) / 1000;
+                const windowDurationMin = (n * intervalSec) / 60;
+                const flipsPerMin = windowDurationMin > 0 ? totalFlips / windowDurationMin : 0;
+                const corrFPRate = totalTotal > 0 ? totalCorrFP / totalTotal : 0;
+
+                const score = accuracy * 40
+                    - (flipsPerMin / 10) * 15
+                    - avgError * 20
+                    - corrFPRate * 25;
+
+                return { score: parseFloat(score.toFixed(3)), accuracy, flipsPerMin: parseFloat(flipsPerMin.toFixed(1)), avgError: parseFloat(avgError.toFixed(3)) };
+            }
+
+            // Backward-compatible wrapper using this.window
+            computeScore() {
+                return this.computeScoreForWindow(this.window);
+            }
+
+            // ─── Cross-sigma evaluation (state machine) ───
+            startEvaluateAcrossSigmas(params, callback) {
+                this.evalState = {
+                    active: true,
+                    sigmas: [4, 8, 10],
+                    idx: 0,
+                    ticks: 0,
+                    window: [],
+                    results: [],
+                    savedSigma: this.getSigma(),
+                    savedParams: { ...params },
+                    callback: callback
+                };
+                // Apply the params to test and set first sigma
+                this.applyParams(params);
+                this.setSigma(this.evalState.sigmas[0]);
+                // Reset sim tags to flush old state for clean eval
+                for (const tag of this.sim.tags) {
+                    tag.roomLock = null;
+                    tag.doorMem.enterCount = 0;
+                    tag.doorMem.exitCount = 0;
+                }
+            }
+
+            finishEvaluateAcrossSigmas() {
+                const es = this.evalState;
+                const scores = es.results.map(r => r.score);
+                const aggScore = Math.min(...scores);
+                const avgScore = scores.reduce((s, v) => s + v, 0) / scores.length;
+                // Restore sigma & params
+                this.setSigma(es.savedSigma);
+                this.applyParams(es.savedParams);
+                const agg = { aggScore, avgScore, results: es.results };
+                const cb = es.callback;
+                this.evalState = null;
+                if (cb) cb(agg);
+            }
+
+            // Check pass criteria: ALL sigmas must meet thresholds
+            checkPassCriteria(results) {
+                for (const r of results) {
+                    if (r.accuracy < 0.99) return false;
+                    if (r.flipsPerMin > 1.0) return false;
+                    if (r.avgError > 0.20) return false;
+                }
+                return true;
+            }
+
+            // ─── Auto-stop: agent is done ───
+            autoStop() {
+                this.active = false;
+                if (this.crossBestParams) {
+                    this.applyParams(this.crossBestParams);
+                }
+                this.lastVerdict = `🏁 TERMINÉ — crossBest=${this.crossBestScore.toFixed(2)}`;
+                this.updateUI();
+                document.getElementById('agState').textContent = '✅ Terminé';
+                document.getElementById('agState').className = 'v best';
+                document.getElementById('btnAgentToggle').textContent = '▶ Start';
+                document.getElementById('btnAgentToggle').classList.remove('active');
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // MAIN TICK HANDLER
+            // ═══════════════════════════════════════════════════════════════
+            onTick() {
+                if (!this.active) return;
+
+                // ─── (A) Cross-sigma evaluation in progress ───
+                if (this.evalState && this.evalState.active) {
+                    const es = this.evalState;
+                    const m = this.collectTickMetrics();
+                    es.window.push(m);
+                    es.ticks++;
+
+                    document.getElementById('agState').textContent = `🔬 Eval σ=${es.sigmas[es.idx]} (${es.ticks}/${this.EVAL_DURATION})`;
+                    document.getElementById('agState').className = 'v trial';
+
+                    if (es.ticks >= this.EVAL_DURATION) {
+                        // Compute score for this sigma
+                        const result = this.computeScoreForWindow(es.window);
+                        result.sigma = es.sigmas[es.idx];
+                        es.results.push(result);
+                        es.idx++;
+
+                        if (es.idx < es.sigmas.length) {
+                            // Move to next sigma
+                            es.ticks = 0;
+                            es.window = [];
+                            this.setSigma(es.sigmas[es.idx]);
+                            // Reset tags for clean eval
+                            for (const tag of this.sim.tags) {
+                                tag.roomLock = null;
+                                tag.doorMem.enterCount = 0;
+                                tag.doorMem.exitCount = 0;
+                            }
+                        } else {
+                            // All sigmas tested — finish
+                            this.finishEvaluateAcrossSigmas();
+                        }
+                    }
+                    this.updateUI();
+                    return; // Don't run normal agent logic during eval
+                }
+
+                // ─── (B) Normal agent logic with staged sigma ───
+                const stage = this.stages[this.stageIndex];
+                // Ensure sigma matches current stage
+                if (this.getSigma() !== stage.sigma && !this.evalState) {
+                    this.setSigma(stage.sigma);
+                }
+
+                // Collect metrics
+                const m = this.collectTickMetrics();
+                this.window.push(m);
+                if (this.window.length > this.TRIAL_DURATION * 3) this.window.shift();
+
+                this.trialTicks++;
+
+                // Phase: TRIAL running
+                if (this.trialParams) {
+                    if (this.trialTicks >= this.TRIAL_DURATION) {
+                        // Evaluate trial
+                        const result = this.computeScore();
+                        if (result.score > this.bestScore) {
+                            this.bestScore = result.score;
+                            this.bestParams = { ...this.trialParams };
+                            this.lastVerdict = `✅ KEEP (${result.score.toFixed(2)} > prev)`;
+                        } else {
+                            this.applyParams(this.bestParams);
+                            this.lastVerdict = `❌ REVERT (${result.score.toFixed(2)} ≤ ${this.bestScore.toFixed(2)})`;
+                        }
+                        this.pushHistory(result);
+                        this.trialParams = null;
+                        this.trialTicks = 0;
+                        this.window = [];
+                        this.iteration++;
+                        this.stageIter++;
+
+                        // ─── Check if stage iteration target reached ───
+                        if (this.stageIter >= stage.iters) {
+                            // Launch cross-sigma validation on bestParams
+                            this.startEvaluateAcrossSigmas(this.bestParams, (agg) => {
+                                const pass = this.checkPassCriteria(agg.results);
+                                if (pass) {
+                                    // Update crossBest if aggScore improves
+                                    if (agg.aggScore > this.crossBestScore) {
+                                        this.crossBestScore = agg.aggScore;
+                                        this.crossBestParams = { ...this.bestParams };
+                                    }
+                                    this.lastVerdict = `✅ Cross-σ OK (agg=${agg.aggScore.toFixed(2)}, avg=${agg.avgScore.toFixed(2)})`;
+
+                                    // Advance to next stage
+                                    this.stageIndex++;
+                                    this.stageIter = 0;
+                                    this.bestScore = -Infinity; // Reset local best for new stage
+
+                                    if (this.stageIndex >= this.stages.length) {
+                                        // All stages complete — auto-stop
+                                        this.autoStop();
+                                        return;
+                                    }
+
+                                    // Set sigma for next stage
+                                    this.setSigma(this.stages[this.stageIndex].sigma);
+                                    this.trialTicks = 0;
+                                    this.window = [];
+                                } else {
+                                    // Failed cross-sigma — continue in same stage (if budget allows)
+                                    const details = agg.results.map(r =>
+                                        `σ${r.sigma}:acc=${(r.accuracy * 100).toFixed(0)}%,flips=${r.flipsPerMin},err=${r.avgError.toFixed(2)}`
+                                    ).join(' | ');
+                                    this.lastVerdict = `⚠️ Cross-σ FAIL — ${details}`;
+
+                                    if (this.stageIter >= this.MAX_STAGE_BUDGET) {
+                                        // Budget exhausted — force advance anyway
+                                        if (agg.aggScore > this.crossBestScore) {
+                                            this.crossBestScore = agg.aggScore;
+                                            this.crossBestParams = { ...this.bestParams };
+                                        }
+                                        this.stageIndex++;
+                                        this.stageIter = 0;
+                                        this.bestScore = -Infinity;
+                                        if (this.stageIndex >= this.stages.length) {
+                                            this.autoStop();
+                                            return;
+                                        }
+                                        this.setSigma(this.stages[this.stageIndex].sigma);
+                                    }
+                                    // Otherwise keep optimizing in same stage
+                                    this.setSigma(stage.sigma);
+                                    this.trialTicks = 0;
+                                    this.window = [];
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    // BASELINE measurement complete, start a new mutation trial
+                    if (this.trialTicks >= this.TRIAL_DURATION) {
+                        const baseline = this.computeScore();
+                        if (this.bestScore === -Infinity) {
+                            this.bestScore = baseline.score;
+                            this.pushHistory(baseline);
+                        }
+                        // Mutate
+                        const mutation = this.mutate(this.bestParams);
+                        this.trialParams = mutation.params;
+                        this.mutatedKey = `${mutation.mutatedKey}: ${mutation.oldVal} → ${mutation.newVal}`;
+                        this.applyParams(this.trialParams);
+                        this.trialTicks = 0;
+                        this.window = [];
+                    }
+                }
+
+                this.updateUI();
+            }
+
+            pushHistory(result) {
+                this.scoreHistory.push(result.score);
+                this.accuracyHistory.push(result.accuracy);
+                this.flipsHistory.push(result.flipsPerMin);
+                this.errorHistory.push(result.avgError);
+                if (this.scoreHistory.length > this.MAX_HISTORY) {
+                    this.scoreHistory.shift(); this.accuracyHistory.shift();
+                    this.flipsHistory.shift(); this.errorHistory.shift();
+                }
+                this.updateCharts();
+            }
+
+            updateUI() {
+                let state, stateClass;
+                if (this.evalState && this.evalState.active) {
+                    state = `🔬 Eval σ=${this.evalState.sigmas[this.evalState.idx] || '?'}`;
+                    stateClass = 'trial';
+                } else if (this.trialParams) {
+                    state = '🧪 Trial';
+                    stateClass = 'trial';
+                } else {
+                    state = '📊 Baseline';
+                    stateClass = 'best';
+                }
+                document.getElementById('agState').textContent = state;
+                document.getElementById('agState').className = 'v ' + stateClass;
+                document.getElementById('agIter').textContent = this.iteration;
+                document.getElementById('agBest').textContent = this.bestScore === -Infinity ? '—' : this.bestScore.toFixed(2);
+                document.getElementById('agMutated').textContent = this.mutatedKey || '—';
+                document.getElementById('agVerdict').textContent = this.lastVerdict;
+
+                // Stage info
+                const stage = this.stages[this.stageIndex];
+                if (stage) {
+                    document.getElementById('agStage').textContent = `σ=${stage.sigma} (iter ${this.stageIter}/${stage.iters})`;
+                } else {
+                    document.getElementById('agStage').textContent = '✅ Tous les stages terminés';
+                }
+
+                // CrossBest
+                document.getElementById('agCrossBest').textContent = this.crossBestScore === -Infinity
+                    ? '—' : `minScore=${this.crossBestScore.toFixed(2)}`;
+
+                // Live metrics
+                const live = this.computeScore();
+                document.getElementById('agTrial').textContent = live.score.toFixed(2);
+                document.getElementById('agAcc').textContent = (live.accuracy * 100).toFixed(1) + '%';
+                document.getElementById('agFlips').textContent = live.flipsPerMin.toFixed(1);
+                document.getElementById('agError').textContent = live.avgError.toFixed(2) + ' m';
+
+                // Params grid
+                const grid = document.getElementById('agentParamsGrid');
+                grid.innerHTML = '';
+                for (const [key, val] of Object.entries(this.bestParams)) {
+                    const isMutated = this.trialParams && this.trialParams[key] !== this.bestParams[key];
+                    const displayVal = isMutated ? this.trialParams[key] : val;
+                    grid.innerHTML += `<div class="ap ${isMutated ? 'mutated' : ''}"><span class="apk">${key}</span><span class="apv">${displayVal}</span></div>`;
+                }
+            }
+
+            initCharts() {
+                const defaults = { responsive: true, animation: false, scales: { x: { display: false }, y: { ticks: { color: '#8b949e', font: { size: 8 } }, grid: { color: '#21262d' } } }, plugins: { legend: { labels: { color: '#8b949e', font: { size: 8 }, boxWidth: 8 } } } };
+
+                this.chartScore = new Chart(document.getElementById('chartAgentScore'), {
+                    type: 'line',
+                    data: {
+                        labels: [], datasets: [
+                            { label: 'Score', data: [], borderColor: '#bc8cff', borderWidth: 1.5, pointRadius: 1, tension: 0.3 },
+                            { label: 'Accuracy', data: [], borderColor: '#3fb950', borderWidth: 1.2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' }
+                        ]
+                    },
+                    options: { ...defaults, scales: { ...defaults.scales, y1: { position: 'right', min: 0, max: 1, ticks: { color: '#3fb950', font: { size: 8 } }, grid: { display: false } } } }
+                });
+
+                this.chartFlips = new Chart(document.getElementById('chartAgentFlips'), {
+                    type: 'line',
+                    data: {
+                        labels: [], datasets: [
+                            { label: 'Flips/min', data: [], borderColor: '#f85149', borderWidth: 1.5, pointRadius: 1, tension: 0.3 },
+                            { label: 'Error (m)', data: [], borderColor: '#d29922', borderWidth: 1.2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' }
+                        ]
+                    },
+                    options: { ...defaults, scales: { ...defaults.scales, y1: { position: 'right', min: 0, ticks: { color: '#d29922', font: { size: 8 } }, grid: { display: false } } } }
+                });
+            }
+
+            updateCharts() {
+                const labels = Array.from({ length: this.scoreHistory.length }, (_, i) => i);
+                this.chartScore.data.labels = labels;
+                this.chartScore.data.datasets[0].data = this.scoreHistory;
+                this.chartScore.data.datasets[1].data = this.accuracyHistory;
+                this.chartScore.update('none');
+
+                this.chartFlips.data.labels = labels;
+                this.chartFlips.data.datasets[0].data = this.flipsHistory;
+                this.chartFlips.data.datasets[1].data = this.errorHistory;
+                this.chartFlips.update('none');
+            }
+
+            start() {
+                this.active = true;
+                this.trialTicks = 0;
+                this.window = [];
+                this.trialParams = null;
+                this.stageIndex = 0;
+                this.stageIter = 0;
+                this.crossBestParams = null;
+                this.crossBestScore = -Infinity;
+                this.evalState = null;
+                // Set sigma to first stage
+                this.setSigma(this.stages[0].sigma);
+            }
+
+            stop() {
+                this.active = false;
+                this.evalState = null;
+                if (this.crossBestParams) {
+                    this.applyParams(this.crossBestParams);
+                } else {
+                    this.applyParams(this.bestParams);
+                }
+            }
+
+            reset() {
+                this.stop();
+                this.iteration = 0;
+                this.bestScore = -Infinity;
+                this.bestParams = this.readCurrentParams();
+                this.lastVerdict = '—';
+                this.mutatedKey = null;
+                this.stageIndex = 0;
+                this.stageIter = 0;
+                this.crossBestParams = null;
+                this.crossBestScore = -Infinity;
+                this.evalState = null;
+                this.scoreHistory = []; this.accuracyHistory = []; this.flipsHistory = []; this.errorHistory = [];
+                this.updateUI(); this.updateCharts();
+                document.getElementById('agState').textContent = 'Idle';
+                document.getElementById('agState').className = 'v idle';
+            }
+        }
+
+        // ─── Bootstrap ───
+        const sim = new RtlsSimulator();
+
+        // ─── Attach Agent ───
+        sim.agent = new StabilityAgent(sim);
+        sim.toggleAgent = function () {
+            if (this.agent.active) {
+                this.agent.stop();
+                document.getElementById('btnAgentToggle').textContent = '▶ Start';
+                document.getElementById('btnAgentToggle').classList.remove('active');
+            } else {
+                this.agent.start();
+                document.getElementById('btnAgentToggle').textContent = '⏸ Stop';
+                document.getElementById('btnAgentToggle').classList.add('active');
+            }
+        };
+        sim.resetAgent = function () {
+            this.agent.reset();
+            document.getElementById('btnAgentToggle').textContent = '▶ Start';
+            document.getElementById('btnAgentToggle').classList.remove('active');
+        };
+
+        // ─── Hook agent into tick loop ───
+        const _origTick = sim.tick.bind(sim);
+        sim.tick = function () {
+            _origTick();
+            this.agent.onTick();
+        };
+    </script>
+</body>
+
+</html>

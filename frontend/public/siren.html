@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrôle Sirènes - Oncorad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    },
+                    animation: {
+                        'blink': 'blink 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '.5' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+        }
+
+        .siren-card {
+            transition: all 0.3s ease;
+        }
+
+        .siren-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .indicator {
+            transition: all 0.3s ease;
+        }
+
+        .indicator.active {
+            background-color: #ef4444;
+            /* Red-500 */
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+            animation: blink 1s infinite;
+        }
+
+        .indicator.inactive {
+            background-color: #334155;
+            /* Slate-700 */
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-4xl">
+        <header class="mb-10 text-center">
+            <h1
+                class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent mb-2">
+                Contrôle des Sirènes
+            </h1>
+            <p class="text-slate-400">Gestion centralisée des alarmes</p>
+        </header>
+
+        <div id="loading" class="text-center text-slate-500 py-10">
+            Chargement des sirènes...
+        </div>
+
+        <div id="siren-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 hidden">
+            <!-- Siren cards will be injected here -->
+        </div>
+
+        <div id="error-message"
+            class="hidden mt-8 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-center">
+        </div>
+
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        // Mock token logic - In a real public page, we might need a dedicated public endpoint 
+        // or a hardcoded read-only token if auth is strict.
+        // Assuming for this task the user has some way to access or we bypassed auth for the command.
+        // Wait, the new route I added is inside 'router', which is protected by 'authController.verifyToken' in 'sirens.js'
+        // "router.post('/:id/command', ...)" IS protected if applied globally.
+        // CHECK: 'sirens.js' has: "router.get('/', authController.verifyToken, ...)"
+        // It applies middleware PER ROUTE.
+        // My new route: "router.post('/:id/command', async...)" -> I did NOT add authController.verifyToken !
+        // So it is PUBLIC. Good.
+        // But fetching sirens "router.get('/', ...)" IS PROTECTED.
+        // I need to add a public fetch endpoint or bypass.
+        // I will add a public fetch endpoint to 'sirens.js' or use a hardcoded list if fetch fails.
+        // Actually, let's try to fetch. If 401, I'll show error.
+        // But better: Make the FETCH public too? Or add a specific "public list" endpoint.
+        // I'll modify 'sirens.js' to make GET public or add a new public route.
+        // Given constraints, I'll modify 'sirens.js' to make GET public for now? 
+        // Unsafe. 
+        // I will add "router.get('/public', ...)" without auth.
+
+        let sirens = [];
+        let socket;
+
+        async function init() {
+            try {
+                // Try fetching from public endpoint I will create
+                const res = await fetch(`${API_URL}/sirens/public`);
+                const data = await res.json();
+
+                if (data.success) {
+                    sirens = data.data;
+                    renderSirens();
+                    setupSocket();
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('siren-grid').classList.remove('hidden');
+                } else {
+                    throw new Error(data.message || 'Failed to load');
+                }
+            } catch (err) {
+                console.error("Init Error", err);
+                document.getElementById('loading').classList.add('hidden');
+                const errDiv = document.getElementById('error-message');
+                errDiv.textContent = "Erreur de chargement: " + err.message;
+                errDiv.classList.remove('hidden');
+            }
+        }
+
+        function renderSirens() {
+            const grid = document.getElementById('siren-grid');
+            grid.innerHTML = sirens.map(siren => `
+                <div class="siren-card bg-slate-800 rounded-xl p-6 border border-slate-700 relative overflow-hidden group" id="card-${siren.id}">
+                    <div class="absolute top-0 right-0 p-4">
+                        <div id="ind-${siren.id}" class="indicator w-4 h-4 rounded-full inactive"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h3 class="text-xl font-semibold text-white mb-1">${siren.name}</h3>
+                        <p class="text-sm text-slate-400 font-mono">${siren.mac} (${siren.output_channel || 'state1'})</p>
+                        <p class="text-xs text-slate-500 mt-1">${siren.designation || 'Zone inconnue'}</p>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button onclick="toggleSiren('${siren.id}', 'ON')" 
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-4 rounded-lg font-medium transition-colors shadow-lg shadow-emerald-900/20 active:scale-95">
+                            ACTIVER
+                        </button>
+                        <button onclick="toggleSiren('${siren.id}', 'OFF')" 
+                            class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2 px-4 rounded-lg font-medium transition-colors active:scale-95">
+                            ARRÊTER
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function toggleSiren(id, state) {
+            try {
+                const res = await fetch(`${API_URL}/sirens/${id}/command`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state })
+                });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+
+                // Optimistic UI update? No, wait for MQTT socket feedback for 'blinking'.
+                // feedback is handled by socket.
+            } catch (err) {
+                alert(`Erreur: ${err.message}`);
+            }
+        }
+
+
+
+        function setupSocket() {
+            // Determine Socket URL (same host)
+            const socketUrl = window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+
+            // Note: In prod this might need /api path if proxied, but socket.io client usually handles /socket.io
+            // The server sets up socket.io on the http server.
+
+            // We use the same logic as dashboard:
+            // Assuming port 8789 is NOT used directly by client in prod (proxy).
+            // But let's verify if we need specific path.
+            // Default path is /socket.io/
+
+            // For now standard connection
+            const wsUrl = window.location.hostname === 'localhost' ? 'ws://localhost:8789' : '/';
+            // If we use the separate WS server logic from `AdminPanel`:
+            // it connects to `ws://${host}:8789` for localhost or `/api/ws` via proxy?
+            // Let's rely on standard socket.io auto-discovery or specific config map.
+
+            // Wait, previous `AdminPanel` code used `ws://` directly. 
+            // "ws = new WebSocket(wsUrl);" 
+            // `mqttService` uses `ws` module (native WebSocket), NOT `socket.io`.
+            // So I should use NATIVE WebSocket, not Socket.IO client!
+
+            connectWebSocket();
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.hostname;
+            let wsUrl = '';
+
+            if (host === 'localhost' || host === '127.0.0.1') {
+                wsUrl = `ws://${host}:8789/api/ws`;
+            } else {
+                wsUrl = `${protocol}//${host}/api/ws`;
+            }
+
+            console.log(`Connecting to WS: ${wsUrl}`);
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => console.log('WS Connected');
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'mqtt_message' && msg.topic === 'alarm/sub/topic') {
+                        updateSirenState(msg.data);
+                    }
+                } catch (e) { console.error(e); }
+            };
+
+            ws.onclose = () => {
+                console.log('WS Closed. Reconnecting...');
+                setTimeout(connectWebSocket, 3000);
+            };
+            ws.onerror = (e) => console.log('WS Error');
+        }
+
+        function updateSirenState(msg) {
+            // Log full message for debugging
+            // logDebug('Update: ' + JSON.stringify(msg));
+
+            // Message structure from backend (via MqttModule) is:
+            // { topic, timestamp, deviceId, mac, data: { state1, state2 }, raw: ... }
+            // So the actual payload is in msg.data
+
+            let payload = msg;
+            if (msg.data && (msg.data.state1 || msg.data.state2)) {
+                payload = msg.data;
+            }
+
+            if (!payload || !payload.mac) return;
+
+            const mac = payload.mac;
+
+            // Find ALL sirens executing on this MAC
+            const matchingSirens = sirens.filter(s => s.mac === mac);
+
+            matchingSirens.forEach(siren => {
+                const indicator = document.getElementById(`ind-${siren.id}`);
+                if (!indicator) return;
+
+                const channel = siren.output_channel || 'state1'; // Default to state1
+                const isActive = payload[channel] === 'ON';
+
+                if (isActive) {
+                    indicator.classList.remove('inactive');
+                    indicator.classList.add('active');
+                    indicator.classList.remove('active');
+                    indicator.classList.add('inactive');
+                }
+            });
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+
+</html>

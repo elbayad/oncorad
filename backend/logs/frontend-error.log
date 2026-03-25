@@ -1,0 +1,3 @@
+2026-03-20T00:31:07: Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+2026-03-20T00:31:07:   npx update-browserslist-db@latest
+2026-03-20T00:31:07:   Why you should do it regularly: https://github.com/browserslist/update-db#readme

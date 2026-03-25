@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Oxygen Tank Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: monospace;
+            padding: 20px;
+        }
+
+        .card {
+            background: #333;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 5px solid #06b6d4;
+            /* Cyan for Oxygen Tank */
+        }
+
+        .log {
+            background: #000;
+            padding: 10px;
+            height: 150px;
+            overflow-y: scroll;
+            border: 1px solid #444;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 class="text-2xl mb-4 text-cyan-400">Oxygen Tank Monitor (Citerne)</h1>
+
+    <div id="status" class="mb-4 text-yellow-500">Connecting...</div>
+
+    <div class="mb-2">Activity Log (Raw)</div>
+    <div id="log" class="log"></div>
+
+    <div class="mb-2">Detected Tanks</div>
+    <div id="cards"></div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const cardsEl = document.getElementById('cards');
+        const statusEl = document.getElementById('status');
+        const PORT = 8789;
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.prepend(div);
+            // Limit to 50 lines
+            if (logEl.children.length > 50) logEl.lastChild.remove();
+        }
+
+        function wssConnect() {
+            let url;
+            const isSecure = window.location.protocol === 'https:';
+
+            if (isSecure) {
+                // In production HTTPS, we rely on the reverse proxy (Nginx/Traefik) to route /api/ to the backend
+                url = `wss://${window.location.host}/api/`;
+            } else {
+                // In development/local HTTP, we connect directly to the backend port
+                url = `ws://${window.location.hostname}:${PORT}`;
+            }
+
+            console.log('Connecting to', url);
+            const ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                statusEl.innerText = 'Connected';
+                statusEl.className = 'mb-4 text-green-500';
+                log('Connected to WebSocket');
+            };
+
+            ws.onclose = () => {
+                statusEl.innerText = 'Disconnected (Retrying...)';
+                statusEl.className = 'mb-4 text-red-500';
+                log('Disconnected');
+                setTimeout(wssConnect, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+
+                    if (msg.type === 'mqtt_message') {
+                        // Filter for Oxygen Tank topic
+                        // Topic: oxygentank/topic
+
+                        if (msg.topic === 'oxygentank/topic' || (msg.data && msg.data.topic === 'oxygentank/topic')) {
+                            console.log('Oxygen Tank Full Frame:', msg);
+                            updateCard(msg.data);
+                            log(`Rx Tank Data from ${msg.data.mac || 'Unknown'}`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+        }
+
+        function updateCard(item) {
+            // Item structure: { mac, stat1, pressure1, stat2, pressure2, deviceId, ... }
+
+            const id = item.mac || item.deviceId || 'Unknown';
+            // Data might be directly on item or in item.data depending on how it was broadcast
+            const data = item.data && item.data.pressure1 !== undefined ? item.data : item;
+
+            let card = document.getElementById(`card-${id}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `card-${id}`;
+                card.className = 'card';
+                cardsEl.prepend(card);
+            }
+
+            // Helper for status dot
+            const getStatusDot = (isActive) => {
+                return isActive
+                    ? '<span class="w-3 h-3 rounded-full bg-green-500 inline-block shadow-[0_0_8px_#22c55e]"></span>'
+                    : '<span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>';
+            };
+
+            const pressure1 = Number(data.pressure1 || 0).toFixed(2);
+            const pressure2 = Number(data.pressure2 || 0).toFixed(2);
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div class="font-bold text-lg text-white">Tank: ${id}</div>
+                    <div class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <!-- Unit 1 -->
+                    <div class="bg-gray-800 p-3 rounded border border-gray-700">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 uppercase text-xs font-bold">Primary Circuit</span>
+                            ${getStatusDot(data.stat1)}
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span class="text-2xl font-mono text-cyan-300">${pressure1}</span>
+                            <span class="text-gray-500 mb-1">Bar</span>
+                        </div>
+                    </div>
+
+                    <!-- Unit 2 -->
+                    <div class="bg-gray-800 p-3 rounded border border-gray-700">
+                         <div class="flex items-center justify-between mb-2">
+                            <span class="text-gray-400 uppercase text-xs font-bold">Secondary Circuit</span>
+                            ${getStatusDot(data.stat2)}
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span class="text-2xl font-mono text-cyan-300">${pressure2}</span>
+                            <span class="text-gray-500 mb-1">Bar</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-2 text-xs text-gray-500 font-mono">
+                    Raw: P1=${pressure1}, S1=${data.stat1}, P2=${pressure2}, S2=${data.stat2}
+                </div>
+            `;
+
+            // Highlight interaction
+            card.style.backgroundColor = '#444';
+            setTimeout(() => card.style.backgroundColor = '#333', 200);
+        }
+
+        wssConnect();
+    </script>
+</body>
+
+</html>

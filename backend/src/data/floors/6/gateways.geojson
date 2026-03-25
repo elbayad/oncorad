@@ -1,0 +1,35 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_22",
+        "type": "gateways",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          401,
+          344
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_28",
+        "type": "gateways",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1503,
+          366
+        ]
+      }
+    }
+  ]
+}

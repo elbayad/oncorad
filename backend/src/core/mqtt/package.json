@@ -1,0 +1,19 @@
+{
+  "name": "@machwatt/mqtt-module",
+  "version": "1.0.0",
+  "description": "Module MQTT réutilisable pour MACHWATT et autres applications",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.3",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": ["mqtt", "iot", "sensors", "monitoring"],
+  "author": "MACHWATT Team",
+  "license": "MIT"
+}

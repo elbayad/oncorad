@@ -1,0 +1,116 @@
+# Configuration Traefik pour IoT Clinic Management
+# oncorad.ishubai.online
+
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/dynamic.yml:/dynamic.yml:ro
+      - ./traefik/acme.json:/acme.json
+    labels:
+      - "traefik.enable=true"
+      
+  iot-clinic:
+    image: nginx:alpine
+    container_name: iot-clinic-proxy
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      
+      # Router configuration
+      - "traefik.http.routers.iot-clinic.rule=Host(`oncorad.ishubai.online`)"
+      - "traefik.http.routers.iot-clinic.entrypoints=web,websecure"
+      - "traefik.http.routers.iot-clinic.middlewares=iot-clinic-headers"
+      
+      # HTTPS / Let's Encrypt
+      - "traefik.http.routers.iot-clinic.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.iot-clinic.tls=true"
+      
+      # Middlewares
+      - "traefik.http.middlewares.iot-clinic-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.iot-clinic-headers.headers.customrequestheaders.X-Forwarded-For="
+      - "traefik.http.middlewares.iot-clinic-headers.headers.sslredirect=true"
+      - "traefik.http.middlewares.iot-clinic-headers.headers.forcesstslist=true"
+      - "traefik.http.middlewares.iot-clinic-headers.headers.sslproxyheaders.X-Forwarded-Proto=https"
+      
+      # Service configuration
+      - "traefik.http.services.iot-clinic.loadbalancer.server.port=80"
+      
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  traefik-network:
+    external: true
+
+# Traefik reverse-proxy configuration
+---
+# traefik/traefik.yml
+
+api:
+  dashboard: true
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    
+  file:
+    filename: /dynamic.yml
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@ishubai.online
+      storage: /acme.json
+      httpChallenge:
+        entryPoint: web
+
+log:
+  level: INFO
+  filePath: /var/log/traefik/traefik.log
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+
+# Dynamic configuration
+---
+# traefik/dynamic.yml
+
+http:
+  middlewares:
+    default-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: https
+        customResponseHeaders:
+          X-Frame-Options: DENY
+          X-Content-Type-Options: nosniff
+          X-XSS-Protection: "1; mode=block"
+          Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+

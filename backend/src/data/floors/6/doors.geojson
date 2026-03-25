@@ -1,0 +1,110 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_01",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          559,
+          484
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_02",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1027,
+          492
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_03",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1494,
+          508
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_04",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1998,
+          504
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_05",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3226,
+          540
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_06",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3786,
+          524
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F6_GW_07",
+        "type": "doors",
+        "floor": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1394,
+          1304
+        ]
+      }
+    }
+  ]
+}

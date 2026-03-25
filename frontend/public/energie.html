@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Energy Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: #eee;
+      font-family: monospace;
+      padding: 20px;
+    }
+
+    .card {
+      background: #333;
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      border-left: 5px solid #3b82f6;
+      /* Blue for Energy */
+    }
+
+    .log {
+      background: #000;
+      padding: 10px;
+      height: 150px;
+      overflow-y: scroll;
+      border: 1px solid #444;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 class="text-2xl mb-4 text-blue-400">Energy Monitor (Energie4)</h1>
+
+  <div id="status" class="mb-4 text-yellow-500">Connecting...</div>
+
+  <div class="mb-2">Activity Log (Raw)</div>
+  <div id="log" class="log"></div>
+
+  <div class="mb-2">Detected Energy Meters</div>
+  <div id="cards"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const cardsEl = document.getElementById('cards');
+    const statusEl = document.getElementById('status');
+    const PORT = 8789;
+
+    function log(msg) {
+      const div = document.createElement('div');
+      div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.prepend(div);
+      // Limit to 50 lines
+      if (logEl.children.length > 50) logEl.lastChild.remove();
+    }
+
+    function wssConnect() {
+      let url;
+      const isSecure = window.location.protocol === 'https:';
+
+      if (isSecure) {
+        // In production HTTPS, we rely on the reverse proxy (Nginx/Traefik) to route /api/ to the backend
+        url = `wss://${window.location.host}/api/`;
+      } else {
+        // In development/local HTTP, we connect directly to the backend port
+        url = `ws://${window.location.hostname}:${PORT}`;
+      }
+
+      console.log('Connecting to', url);
+      const ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        statusEl.innerText = 'Connected';
+        statusEl.className = 'mb-4 text-green-500';
+        log('Connected to WebSocket');
+      };
+
+      ws.onclose = () => {
+        statusEl.innerText = 'Disconnected (Retrying...)';
+        statusEl.className = 'mb-4 text-red-500';
+        log('Disconnected');
+        setTimeout(wssConnect, 3000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === 'mqtt_message') {
+            // Filter for Energie4 topic
+            // Based on mqttService.js, topic is mapped to MQTT_TOPICS.ENERGIE4 ('energie4/topic')
+
+            let isEnergy = false;
+            if (msg.topic === 'energie4/topic') isEnergy = true;
+
+            // Also check if the data structure matches what we expect from parseEnergie4Data in mqttService.js
+            // The service broadcasts the parsed data which has structure: { topic: 'energie4/topic', data: { tensionA: ... } }
+            // Wait, looking at mqttService.js broadcastMessage:
+            // It broadcasts: { type: 'mqtt_message', topic: topic, data: data }
+            // And for Energie4, the 'data' passed to broadcastMessage is the ITEM from the array loop.
+            // item structure coming from parseEnergie4Data has: { topic, timestamp, deviceId, mac, data: { ...fields... }, raw }
+
+            // So msg.data will be that object.
+
+            if (msg.topic === 'energie4/topic' || (msg.data && msg.data.topic === 'energie4/topic')) {
+              console.log('Energie4 Full Frame:', msg); // Added for debug
+              updateCard(msg.data);
+              log(`Rx Energy Data from ${msg.data.deviceId || 'Unknown'}`);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    function updateCard(item) {
+      // Item structure from mqttService.js parseEnergie4Data:
+      // { topic, timestamp, deviceId, mac, data: { tensionA, puissanceTotale, ... }, raw }
+
+      const id = item.deviceId || item.mac || 'Unknown';
+      const data = item.data || {};
+
+      let card = document.getElementById(`card-${id}`);
+      if (!card) {
+        card = document.createElement('div');
+        card.id = `card-${id}`;
+        card.className = 'card';
+        cardsEl.prepend(card);
+      }
+
+      // Power Factor Color Logic
+      const pf = data.facteurPuissanceTotal || 0;
+      let pfColor = 'text-red-400';
+      if (pf > 0.9) pfColor = 'text-green-400';
+      else if (pf > 0.8) pfColor = 'text-yellow-400';
+
+      card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div class="font-bold text-lg text-white">Meter: ${id}</div>
+                    <div class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</div>
+                </div>
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <!-- Voltage -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">Voltage (L1/L2/L3)</div>
+                        <div class="font-mono text-blue-300">
+                            ${(data.tensionA || 0).toFixed(1)}V / 
+                            ${(data.tensionB || 0).toFixed(1)}V / 
+                            ${(data.tensionC || 0).toFixed(1)}V
+                        </div>
+                    </div>
+
+                    <!-- Current -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">Current (L1/L2/L3)</div>
+                        <div class="font-mono text-purple-300">
+                            ${(data.courantA || 0).toFixed(2)}A / 
+                            ${(data.courantB || 0).toFixed(2)}A / 
+                            ${(data.courantC || 0).toFixed(2)}A
+                        </div>
+                    </div>
+
+                    <!-- Power -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">Active Power (Total)</div>
+                        <div class="font-mono text-green-300 text-lg">
+                            ${(data.puissanceTotale || 0).toFixed(2)} kW
+                        </div>
+                    </div>
+                    
+                    <!-- Energy & PF -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">Energy Import</div>
+                        <div class="font-mono text-orange-300">
+                            ${(data.energieActiveImport || 0).toFixed(1)} kWh
+                        </div>
+                         <div class="text-gray-400 text-xs uppercase mt-2 mb-1">Power Factor</div>
+                        <div class="font-mono ${pfColor}">
+                            ${(pf).toFixed(2)}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Detailed Table Toggle (Optional, kept simple for now) -->
+                <div class="mt-2 text-xs text-gray-500 font-mono break-all">
+                    Freq: ${(data.frequence || 0).toFixed(1)}Hz
+                </div>
+            `;
+
+      // Highlight interaction
+      card.style.backgroundColor = '#444';
+      setTimeout(() => card.style.backgroundColor = '#333', 200);
+    }
+
+    wssConnect();
+  </script>
+</body>
+
+</html>

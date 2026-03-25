@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enregistrement Équipement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#111827',
+                            card: '#1F2937',
+                            text: '#F9FAFB'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #F9FAFB;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+
+<body class="min-h-screen p-4 flex items-center justify-center">
+
+    <div class="bg-gray-800 p-6 rounded-xl shadow-xl w-full max-w-md border border-gray-700">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-blue-400">Nouvel Équipement</h1>
+            <button type="button" id="newRegistrationBtn"
+                class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition" title="Nouveau dossier">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
+        </div>
+
+        <form id="equipmentForm" class="space-y-4">
+
+            <!-- ID (Scan) -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">ID (Scan QR)</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="assetId" required
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Scanner le QR Code..." autofocus>
+                    <button type="button" id="scanQrBtn"
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">L'ID sera converti en minuscules.</p>
+            </div>
+
+            <!-- Photo Capture -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Photo de l'équipement</label>
+                <div
+                    class="relative w-full aspect-video bg-gray-900 rounded-lg overflow-hidden border border-gray-600 mb-2">
+                    <video id="camera" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <canvas id="photoCanvas" class="hidden w-full h-full object-cover"></canvas>
+                    <img id="photoPreview" class="hidden w-full h-full object-cover" />
+                </div>
+
+                <div class="flex space-x-2">
+                    <button type="button" id="startCameraBtn"
+                        class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 rounded-lg text-sm transition">
+                        Activer Caméra
+                    </button>
+                    <button type="button" id="takePhotoBtn"
+                        class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-sm transition hidden">
+                        Prendre Photo
+                    </button>
+                    <button type="button" id="retakePhotoBtn"
+                        class="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white py-2 rounded-lg text-sm transition hidden">
+                        Reprendre
+                    </button>
+                </div>
+                <input type="hidden" id="photoData">
+            </div>
+
+            <!-- Name -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Nom de l'équipement</label>
+                <input type="text" id="assetName" required
+                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: Moniteur Cardiaque">
+            </div>
+
+            <!-- Floor -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Étage</label>
+                <select id="floorSelect" required
+                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">Chargement...</option>
+                </select>
+            </div>
+
+            <!-- Room -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Salle / Room</label>
+                <input type="text" id="assetRoom" required
+                    class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ex: Salle 101">
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" id="submitBtn"
+                class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg shadow-lg transform transition hover:scale-[1.02]">
+                Enregistrer l'équipement
+            </button>
+            <input type="hidden" id="originalFloorId">
+            <input type="hidden" id="isEditMode" value="false">
+        </form>
+
+        <div id="statusMessage" class="mt-4 text-center text-sm hidden"></div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal"
+        class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative border border-gray-700">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-white">Scanner un QR Code</h3>
+                <button type="button" id="closeScannerBtn"
+                    class="p-2 hover:bg-gray-700 rounded-full transition-colors text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="reader" class="w-full rounded-xl overflow-hidden bg-black relative"></div>
+
+                <!-- Zoom Control -->
+                <div id="zoomControl" class="hidden mt-4 flex items-center space-x-2 bg-gray-700/50 p-2 rounded-lg">
+                    <span class="text-xs text-gray-300">➖</span>
+                    <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1"
+                        class="w-full h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer">
+                    <span class="text-xs text-gray-300">➕</span>
+                </div>
+
+                <p class="text-center text-sm text-gray-400 mt-2">Eloignez le téléphone (15cm) et utilisez le zoom</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 z-[60] bg-gray-900 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
+            <h2 class="text-2xl font-bold text-center mb-6 text-white">Connexion Requise</h2>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Email</label>
+                    <input type="email" id="loginEmail" required
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="admin@clinic.com">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Mot de passe</label>
+                    <input type="password" id="loginPassword" required
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="password123">
+                </div>
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg transition">
+                    Se connecter
+                </button>
+                <p id="loginError" class="text-red-400 text-sm text-center hidden"></p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let stream = null;
+        let scannerTrack = null; // Store track for zoom
+
+        // Elements
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('photoCanvas');
+        const preview = document.getElementById('photoPreview');
+        const photoDataInput = document.getElementById('photoData');
+        const startBtn = document.getElementById('startCameraBtn');
+        const takeBtn = document.getElementById('takePhotoBtn');
+        const retakeBtn = document.getElementById('retakePhotoBtn');
+        const statusMsg = document.getElementById('statusMessage');
+        const submitBtn = document.getElementById('submitBtn');
+        const isEditModeInput = document.getElementById('isEditMode');
+
+        let typingTimer;
+        const doneTypingInterval = 500; // ms
+
+        // QR Scanner Logic
+        const scanBtn = document.getElementById('scanQrBtn');
+        const modal = document.getElementById('scannerModal');
+        const closeScanBtn = document.getElementById('closeScannerBtn');
+        const zoomControl = document.getElementById('zoomControl');
+        const zoomSlider = document.getElementById('zoomSlider');
+        let html5QrCode = null;
+
+        function closeScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    modal.classList.add('hidden');
+                }).catch(err => {
+                    console.error("Failed to stop scanner", err);
+                    modal.classList.add('hidden');
+                });
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Handle manual zoom
+        zoomSlider.addEventListener('input', (e) => {
+            if (scannerTrack && scannerTrack.getCapabilities().zoom) {
+                scannerTrack.applyConstraints({
+                    advanced: [{ zoom: parseFloat(e.target.value) }]
+                });
+            }
+        });
+
+        scanBtn.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            zoomControl.classList.add('hidden'); // Hide until capability confirmed
+
+            // Wait for modal to be visible before rendering scanner
+            setTimeout(() => {
+                html5QrCode = new Html5Qrcode("reader");
+
+                const cameraConfig = { facingMode: "environment" };
+                const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+                html5QrCode.start(cameraConfig, config, (decodedText, decodedResult) => {
+                    // Success callback
+                    console.log(`Code matched = ${decodedText}`, decodedResult);
+                    const id = decodedText.toLowerCase().trim();
+                    document.getElementById('assetId').value = id;
+                    closeScanner();
+                    checkAsset(id);
+                }, (errorMessage) => {
+                    // Parse error
+                })
+                    .then(() => {
+                        // Apply High Res & Zoom
+                        setTimeout(() => {
+                            const video = document.querySelector("#reader video");
+                            if (video && video.srcObject) {
+                                scannerTrack = video.srcObject.getVideoTracks()[0];
+                                const caps = scannerTrack.getCapabilities();
+
+                                let constraints = {
+                                    width: { min: 640, ideal: 1920 },
+                                    height: { min: 480, ideal: 1080 },
+                                    advanced: [{ focusMode: "continuous" }]
+                                };
+
+                                // Setup Zoom if available
+                                if (caps.zoom) {
+                                    zoomControl.classList.remove('hidden');
+                                    zoomSlider.min = caps.zoom.min;
+                                    zoomSlider.max = caps.zoom.max;
+                                    zoomSlider.step = caps.zoom.step || 0.1;
+
+                                    // Default to 2x or mid-zoom for small codes
+                                    const initialZoom = Math.min(caps.zoom.max, 2.0);
+                                    zoomSlider.value = initialZoom;
+                                    constraints.advanced[0].zoom = initialZoom;
+                                }
+
+                                scannerTrack.applyConstraints(constraints)
+                                    .catch(err => console.warn("Constraints failed", err));
+                            }
+                        }, 500);
+                    })
+                    .catch((err) => {
+                        console.error(`Error starting scanner: ${err}`);
+                        alert("Erreur démarrage scanner: " + err);
+                        closeScanner();
+                    });
+            }, 200);
+        });
+
+        closeScanBtn.addEventListener('click', closeScanner);
+
+        // Initial Load
+        async function loadFloors() {
+            try {
+                const token = localStorage.getItem('clinicToken'); // Assuming auth token might be needed or handled by proxy
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+                const res = await fetch(`${API_BASE}/floors`, { headers });
+
+                if (res.status === 401) {
+                    handleAuthError();
+                    return;
+                }
+
+                const json = await res.json();
+
+                const select = document.getElementById('floorSelect');
+                select.innerHTML = '';
+
+                if (json.success) {
+                    json.data.forEach(floor => {
+                        const option = document.createElement('option');
+                        option.value = floor.id;
+                        option.textContent = `${floor.name} - ${floor.description || ''}`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">Erreur chargement</option>';
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('floorSelect').innerHTML = '<option value="1">Par défaut (Étage 1)</option>';
+            }
+        }
+
+        // loadFloors() called by checkAuth
+
+        // Auth Logic
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const loginError = document.getElementById('loginError');
+
+        function handleAuthError() {
+            localStorage.removeItem('clinicToken');
+
+            // Force modal show
+            const modal = document.getElementById('loginModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex'; // Force display just in case
+            }
+
+            // Optional: Alert if modal fails? No, let's trust the modal.
+            // visual feedback in main form too
+            const select = document.getElementById('floorSelect');
+            if (select) select.innerHTML = '<option value="">Connexion requise...</option>';
+        }
+
+        function checkAuth() {
+            const token = localStorage.getItem('clinicToken');
+            if (!token) {
+                loginModal.classList.remove('hidden');
+            } else {
+                loginModal.classList.add('hidden');
+                loadFloors(); // Load data only if auth
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            // Critical fix for mobile: trim whitespace!
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const btn = document.getElementById('loginBtn');
+
+            btn.disabled = true;
+            btn.textContent = 'Connexion...';
+            loginError.classList.add('hidden');
+
+            try {
+                // DEBUG: Alert before fetch with quotes to see spaces
+                alert(`Envoi: "${email}" / "${password}"`);
+
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                // DEBUG: Alert response status
+                alert(`Réponse serveur: ${res.status} ${res.statusText}`);
+
+                const json = await res.json();
+                console.log("Login res:", json);
+
+                if (json.success) {
+                    alert("✅ Connexion réussie ! Token reçu.");
+                    localStorage.setItem('clinicToken', json.data.token);
+
+                    // Force refresh or clean UI
+                    const modal = document.getElementById('loginModal');
+                    if (modal) {
+                        modal.classList.add('hidden');
+                        modal.style.display = 'none';
+                    }
+
+                    loadFloors();
+                } else {
+                    alert("❌ Echec connexion: " + (json.message || "Erreur inconnue"));
+                    throw new Error(json.message || 'Login failed');
+                }
+            } catch (err) {
+                console.error("Login Error", err);
+                alert("🔴 Erreur JS/Réseau: " + err.message);
+                loginError.textContent = err.message;
+                loginError.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Se connecter';
+            }
+        });
+
+        // Initialize
+        checkAuth();
+
+        // Camera Logic
+        async function startCamera() {
+            try {
+                // Try rear camera first
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                } catch (e) {
+                    console.warn("Rear camera not found, trying default...", e);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
+
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                preview.classList.add('hidden');
+                startBtn.classList.add('hidden');
+                takeBtn.classList.remove('hidden');
+                retakeBtn.classList.add('hidden');
+            } catch (err) {
+                console.error(err);
+                alert("Impossible d'accéder à la caméra : " + (err.message || err.name));
+            }
+        }
+
+        startBtn.addEventListener('click', startCamera);
+
+        takeBtn.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            photoDataInput.value = dataUrl;
+            preview.src = dataUrl;
+
+            video.classList.add('hidden');
+            preview.classList.remove('hidden');
+            takeBtn.classList.add('hidden');
+            retakeBtn.classList.remove('hidden');
+
+            // Stop stream to save resources? 
+            // For now, let's keep it running unless we really need to stop it. 
+            // Actually, stopping it is better for battery on mobile.
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        });
+
+        retakeBtn.addEventListener('click', () => {
+            photoDataInput.value = '';
+            preview.classList.add('hidden');
+
+            // Restart camera immediately
+            startCamera();
+        });
+
+        // Form Submit
+        document.getElementById('equipmentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Enregistrement...';
+            statusMsg.classList.add('hidden');
+
+            const id = document.getElementById('assetId').value.trim().toLowerCase();
+            const name = document.getElementById('assetName').value;
+            const floorId = parseInt(document.getElementById('floorSelect').value);
+            const room = document.getElementById('assetRoom').value;
+            const photoData = photoDataInput.value;
+            const isEdit = isEditModeInput.value === 'true';
+
+            try {
+                const token = localStorage.getItem('clinicToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                };
+
+                const assetPayload = {
+                    id: id,
+                    name: name,
+                    floor_id: floorId,
+                    type_id: 'equipment',
+                    category: 'equipment',
+                    status: 'active',
+                    room: room
+                };
+
+                // Create or Update
+                let res;
+                if (isEdit) {
+                    res = await fetch(`${API_BASE}/assets/${id}`, {
+                        method: 'PUT',
+                        headers,
+                        body: JSON.stringify(assetPayload)
+                    });
+                } else {
+                    res = await fetch(`${API_BASE}/assets`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(assetPayload)
+                    });
+                }
+
+                const json = await res.json();
+
+                // Handle Errors or Success
+
+                // Special handling for duplicates during create
+                if (res.status === 409) {
+                    showStatus("⚠️ Cet ID existe déjà. Chargement des données...", 'text-yellow-400');
+                    await checkAsset(id);
+                    submitBtn.disabled = false;
+                    // submitBtn text will be updated by checkAsset
+                    return;
+                } else if (res.status === 401) {
+                    showStatus("🔴 Session expirée. Connexion requise.", 'text-red-400');
+                    handleAuthError();
+                    return;
+                }
+
+                if (!json.success) throw new Error(json.message || "Erreur enregistrement asset");
+
+                // Always update location/zone explicitly to be safe
+                await fetch(`${API_BASE}/assets/${id}/location`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({ floor_id: floorId, room: room })
+                });
+
+                // Handle Photo - only if new photo taken (photoData not empty)
+                if (photoData) {
+                    const uploadRes = await fetch(`${API_BASE}/assets/upload-photo`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ id: id, image: photoData })
+                    });
+                    const uploadJson = await uploadRes.json();
+                    if (!uploadJson.success) console.error("Erreur upload photo", uploadJson);
+                }
+
+                showStatus(isEdit ? "✅ Équipement mis à jour avec succès !" : "✅ Équipement enregistré avec succès !", 'text-green-400');
+
+                setTimeout(() => {
+                    resetForm();
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                showStatus("❌ Erreur: " + err.message, 'text-red-400');
+            } finally {
+                submitBtn.disabled = false;
+                // Text will be reset by checkAsset/resetForm logic or remain as is if error
+            }
+        });
+
+        function showStatus(msg, colorClass) {
+            statusMsg.textContent = msg;
+            statusMsg.className = `mt-4 text-center text-sm ${colorClass}`;
+            statusMsg.classList.remove('hidden');
+        }
+
+        // Auto lowercase ID
+        const assetIdInput = document.getElementById('assetId');
+        assetIdInput.addEventListener('input', function (e) {
+            this.value = this.value.toLowerCase();
+            clearTimeout(typingTimer);
+            const val = this.value.trim();
+            if (val) {
+                typingTimer = setTimeout(() => checkAsset(val), doneTypingInterval);
+            }
+        });
+
+        // Check if asset exists
+        async function checkAsset(rawId) {
+            if (!rawId) return;
+
+            // Strip quotes and whitespace
+            const id = rawId.replace(/['"]+/g, '').trim().toLowerCase();
+            document.getElementById('assetId').value = id; // Update UI with clean ID
+
+            // DEBUG: Show what we are searching, make visible immediately
+            statusMsg.textContent = `🔍 Recherche de l'ID: "${id}"...`;
+            statusMsg.className = "mt-4 text-center text-sm text-blue-300";
+            statusMsg.classList.remove('hidden');
+
+            try {
+                const token = localStorage.getItem('clinicToken');
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+                const res = await fetch(`${API_BASE}/assets/${id}`, { headers });
+
+                // DEBUG: Check status
+                if (res.status === 404) {
+                    showStatus(`ℹ️ ID "${id}" inconnu. Création...`, "text-gray-400");
+                    // Ensure UI is in creation mode
+                    isEditModeInput.value = "false";
+                    submitBtn.textContent = "Enregistrer l'équipement";
+                    submitBtn.classList.replace('bg-blue-600', 'bg-green-600');
+                    submitBtn.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');
+                    return;
+                } else if (res.status === 401) {
+                    showStatus(`🔴 Session expirée. Veuillez vous reconnecter.`, "text-red-400");
+                    handleAuthError();
+                    return;
+                } else if (!res.ok) {
+                    showStatus(`🔴 Erreur HTTP: ${res.status}`, "text-red-400");
+                    return;
+                }
+
+                const json = await res.json();
+                console.log("Check response:", json);
+
+                if (json.success && json.data) {
+                    showStatus(`✅ Asset trouvé! Chargement...`, "text-green-400");
+                    // Update Mode
+                    const asset = json.data;
+                    isEditModeInput.value = "true";
+                    submitBtn.textContent = "Mettre à jour";
+                    submitBtn.classList.replace('bg-green-600', 'bg-blue-600');
+                    submitBtn.classList.replace('hover:bg-green-500', 'hover:bg-blue-500');
+
+                    document.getElementById('assetName').value = asset.name || '';
+                    document.getElementById('floorSelect').value = asset.floor_id || '';
+                    document.getElementById('assetRoom').value = asset.room || asset.zone || '';
+
+                    // Show photo if exists - Add timestamp to force refresh!
+                    const photoUrl = `/photos/${asset.id}.jpg?t=${Date.now()}`;
+                    const img = new Image();
+                    img.onload = function () {
+                        preview.src = photoUrl;
+                        preview.classList.remove('hidden');
+                        video.classList.add('hidden');
+                        startBtn.classList.add('hidden');
+                        takeBtn.classList.add('hidden');
+                        retakeBtn.classList.remove('hidden');
+                    };
+                    img.onerror = function () {
+                        // Keep camera active if no photo
+                    };
+                    img.src = photoUrl;
+
+                    showStatus(`⚠️ Mode Édition: ${asset.name}`, "text-blue-400");
+                } else {
+                    // Falls back here if !json.success but status was 200 (unlikely with this API)
+                    showStatus(`ℹ️ Erreur format: ${json.message}`, "text-red-400");
+                }
+            } catch (e) {
+                console.error("Check asset error", e);
+                showStatus(`🔴 Erreur réseau: ${e.message}`, "text-red-500");
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('equipmentForm').reset();
+            photoDataInput.value = '';
+
+            // UI Reset
+            preview.classList.add('hidden');
+            preview.src = '';
+            video.classList.remove('hidden');
+            if (stream && stream.active) {
+                takeBtn.classList.remove('hidden');
+                retakeBtn.classList.add('hidden');
+                startBtn.classList.add('hidden');
+            } else {
+                startBtn.classList.remove('hidden');
+                takeBtn.classList.add('hidden');
+                retakeBtn.classList.add('hidden');
+            }
+
+            statusMsg.classList.add('hidden');
+
+            // Edit Mode Reset
+            isEditModeInput.value = "false";
+            submitBtn.textContent = "Enregistrer l'équipement";
+            submitBtn.classList.replace('bg-blue-600', 'bg-green-600');
+            submitBtn.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');
+
+            assetIdInput.focus();
+        }
+
+        // New Registration Button (Reset)
+        document.getElementById('newRegistrationBtn').addEventListener('click', resetForm);
+    </script>
+</body>
+
+</html>

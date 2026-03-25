@@ -1,0 +1,133 @@
+/* Leaflet styles */
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Styles pour les popups RTLS */
+.rtls-popup .leaflet-popup-content-wrapper {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 14px;
+  padding: 0;
+}
+
+.rtls-popup .leaflet-popup-tip {
+  background: #0f1a33;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.rtls-card {
+  position: relative;
+  width: 300px;
+  background: #0f1a33;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  color: #eaf1ff;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.rtls-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--type-color, #6aa0ff);
+}
+
+@layer base {
+  html {
+    transition: background-color 0.2s ease-in-out;
+  }
+  
+  body {
+    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  }
+}
+
+/* Amélioration contraste dark mode pour les champs de saisie */
+@layer components {
+  .input {
+    @apply bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  }
+  .dark .input {
+    @apply bg-gray-800 text-gray-100 placeholder-gray-400 border-gray-700 focus:ring-blue-400 focus:border-blue-400;
+  }
+}
+
+/* ==============================================
+   RTL SUPPORT FOR ARABIC
+   ============================================== */
+
+/* Flip horizontal spacing utilities in RTL mode */
+[dir="rtl"] .space-x-1 > :not([hidden]) ~ :not([hidden]),
+[dir="rtl"] .space-x-1\.5 > :not([hidden]) ~ :not([hidden]),
+[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]),
+[dir="rtl"] .space-x-3 > :not([hidden]) ~ :not([hidden]),
+[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+}
+
+/* Flip margins */
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .ml-3 { margin-left: 0; margin-right: 0.75rem; }
+[dir="rtl"] .ml-4 { margin-left: 0; margin-right: 1rem; }
+[dir="rtl"] .mr-1 { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .mr-3 { margin-right: 0; margin-left: 0.75rem; }
+[dir="rtl"] .mr-4 { margin-right: 0; margin-left: 1rem; }
+
+/* Flip padding */
+[dir="rtl"] .pl-2 { padding-left: 0; padding-right: 0.5rem; }
+[dir="rtl"] .pl-3 { padding-left: 0; padding-right: 0.75rem; }
+[dir="rtl"] .pl-4 { padding-left: 0; padding-right: 1rem; }
+[dir="rtl"] .pr-2 { padding-right: 0; padding-left: 0.5rem; }
+[dir="rtl"] .pr-3 { padding-right: 0; padding-left: 0.75rem; }
+[dir="rtl"] .pr-4 { padding-right: 0; padding-left: 1rem; }
+[dir="rtl"] .pr-12 { padding-right: 0; padding-left: 3rem; }
+
+/* Flip positioning */
+[dir="rtl"] .left-0 { left: auto; right: 0; }
+[dir="rtl"] .right-0 { right: auto; left: 0; }
+[dir="rtl"] .inset-y-0.left-0 { left: auto; right: 0; }
+
+/* Flip sidebar transform */
+[dir="rtl"] .-translate-x-full { transform: translateX(100%); }
+[dir="rtl"] .translate-x-0 { transform: translateX(0); }
+[dir="rtl"] .lg\:translate-x-0 { transform: translateX(0); }
+
+/* Flip text alignment where needed */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* Flip border radius for directional elements */
+[dir="rtl"] .rounded-l-lg { border-radius: 0 0.5rem 0.5rem 0; }
+[dir="rtl"] .rounded-r-lg { border-radius: 0.5rem 0 0 0.5rem; }
+
+/* RTLS card accent bar flips to right side in RTL */
+[dir="rtl"] .rtls-card::after {
+  left: auto;
+  right: 0;
+}
+
+/* Arabic font hint — uses system Arabic fonts with fallback */
+[dir="rtl"] body {
+  font-family: 'Segoe UI', 'Noto Sans Arabic', 'Tahoma', 'Arial', sans-serif;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}

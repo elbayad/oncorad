@@ -1,0 +1,797 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>RTLS Diagnostic Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/cliicon.png" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --panel: #25262b;
+      --border: #2c2e33;
+      --text: #c1c2c5;
+      --text-dim: #909296;
+      --accent: #339af0;
+      --success: #40c057;
+      --danger: #fa5252;
+      --warning: #fcc419;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 320px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      box-shadow: 4px 0 12px rgba(0, 0, 0, 0.2);
+    }
+
+    #header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--border);
+      color: var(--text-dim);
+    }
+
+    .status-badge.connected {
+      background: rgba(64, 192, 87, 0.2);
+      color: var(--success);
+    }
+
+    .kpi-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .kpi-card {
+      flex: 1;
+      background: var(--bg);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .kpi-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .kpi-card.ok .kpi-val {
+      color: var(--success);
+    }
+
+    .kpi-card.err .kpi-val {
+      color: var(--danger);
+    }
+
+    #controls {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    select {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    #legend {
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    #tag-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .tag-item {
+      padding: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .tag-item.unknown {
+      border-left: 3px solid var(--danger);
+    }
+
+    .tag-item.known {
+      border-left: 3px solid var(--success);
+    }
+
+    #map-container {
+      flex: 1;
+      position: relative;
+      background: #000;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .leaflet-container {
+      background: #101113;
+    }
+
+    .floor-name {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 4px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 1.2em;
+      color: #fff;
+      z-index: 400;
+    }
+
+    .anchor-tooltip {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--border);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      white-space: nowrap;
+    }
+
+    .room-centroid-tooltip {
+      background: rgba(255, 159, 67, 0.85);
+      border: 1px solid #e67e22;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(255, 159, 67, 0.4);
+      white-space: nowrap;
+    }
+
+    .leaflet-tooltip-left:before {
+      border-right-color: rgba(0, 0, 0, 0.7);
+    }
+
+    .leaflet-tooltip-right:before {
+      border-left-color: rgba(0, 0, 0, 0.7);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      body {
+        flex-direction: column;
+      }
+
+      #sidebar {
+        width: 100%;
+        height: 40vh;
+        order: 2;
+        /* Map on top? or Sidebar on top? usually map is main. Let's keep sidebar on top for controls? No, map is hero. */
+        /* Actually sidebar has kpis. Let's keep standard flow: Sidebar top, Map bottom. */
+        order: 1;
+        overflow-y: auto;
+      }
+
+      #map-container {
+        height: 60vh;
+        order: 2;
+      }
+
+      .kpi-row {
+        padding: 8px;
+      }
+
+      .kpi-val {
+        font-size: 1.1rem;
+      }
+    }
+
+    /* Fullscreen Mode */
+    body.fullscreen-mode #sidebar {
+      display: none;
+    }
+
+    body.fullscreen-mode #map-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    #fullscreen-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 500;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: 1px solid var(--border);
+      padding: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    #fullscreen-btn:hover {
+      background: rgba(0, 0, 0, 0.8);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="sidebar">
+    <div id="header">
+      <h1>
+        Diagnostic RTLS
+        <span id="connection-status" class="status-badge">Offline</span>
+      </h1>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card ok">
+        <div class="kpi-val" id="kpi-anchors-ok">0</div>
+        <div class="kpi-label">Anchors OK</div>
+      </div>
+      <div class="kpi-card err">
+        <div class="kpi-val" id="kpi-anchors-ko">0</div>
+        <div class="kpi-label">Anchors HS</div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-val" id="kpi-tags-known">0</div>
+        <div class="kpi-label">Tags Connus</div>
+      </div>
+      <div class="kpi-card err">
+        <div class="kpi-val" id="kpi-tags-unknown">0</div>
+        <div class="kpi-label">Tags Inconnus</div>
+      </div>
+    </div>
+
+    <div id="legend">
+      <div class="legend-item">
+        <div class="dot" style="background:#40c057;box-shadow:0 0 4px #40c057"></div> Anchor OK (< 2min)</div>
+          <div class="legend-item">
+            <div class="dot" style="background:#fa5252;box-shadow:0 0 4px #fa5252"></div> Anchor HS (> 2min)
+          </div>
+          <div class="legend-item">
+            <div class="dot" style="background:#40c057;border:2px solid #fff"></div> Tag Connu
+          </div>
+          <div class="legend-item">
+            <div class="dot" style="background:#fa5252;border:2px solid #fff"></div> Tag Inconnu/Non-Registered
+          </div>
+      </div>
+
+      <div id="controls">
+        <select id="floor-select">
+          <option>Chargement...</option>
+        </select>
+        <button id="btn-builder" onclick="toggleBuilder()"
+          style="padding:4px 8px;cursor:pointer;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;">✏️
+          Maps</button>
+      </div>
+
+      <div id="builder-controls"
+        style="display:none; gap:5px; padding:0 16px 12px 16px; border-bottom:1px solid var(--border);">
+        <button onclick="clearLines()"
+          style="flex:1;background:var(--danger);color:#fff;border:none;padding:6px;border-radius:4px;cursor:pointer;">Clear</button>
+        <button onclick="saveLines()"
+          style="flex:1;background:var(--success);color:#fff;border:none;padding:6px;border-radius:4px;cursor:pointer;">Save</button>
+      </div>
+
+      <div id="tag-list"></div>
+    </div>
+
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="floor-indicator" class="floor-name"></div>
+      <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
+    </div>
+
+    <script>
+      // Config
+      const PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const HOST = window.location.hostname;
+      const PORT = window.location.port ? `:${window.location.port}` : '';
+
+      // If dev port 517x, we might need to proxy, but we use the relative /api/ws 
+      // which Vite proxies. IF we want to bypass vite proxy we'd assume :8789.
+      // BUT robust solution = go through same origin/port as page.
+
+      const WS_URL = `${PROTOCOL}//${HOST}${PORT}/api/ws`;
+      const API_BASE = '/api';
+
+      // State
+      let map, floorLayer, anchorsLayer, roomCentroidsLayer, tagsLayer;
+      let currentFloor = null;
+      let floors = [];
+      let anchors = [];
+      let roomCentroids = [];
+      let tags = new Map(); // id -> { data, marker, element }
+      let ws = null;
+
+      // Limits
+      const ANCHOR_TIMEOUT_MS = 5 * 60 * 1000; // 5 mins
+
+      // --- Map Builder State ---
+      let isBuilderMode = false;
+      let builderLayer = null;
+      let drawnLines = []; // [ [{x,y}, {x,y}], ... ]
+      let currentLinePoints = [];
+      let tempLinePoly = null;
+
+      // Event Listeners
+      document.getElementById('floor-select').onchange = (e) => loadFloor(e.target.value);
+
+      // --- Init ---
+      async function init() {
+        // Map
+        map = L.map('map', { crs: L.CRS.Simple, minZoom: -2, maxZoom: 2 }).setView([0, 0], 0);
+        floorLayer = L.geoJSON(null, { style: { color: '#444', weight: 1, fillColor: '#222', fillOpacity: 0.5 } }).addTo(map);
+
+        // Layers
+        builderLayer = L.layerGroup().addTo(map);
+        anchorsLayer = L.layerGroup().addTo(map);
+        roomCentroidsLayer = L.layerGroup().addTo(map);
+        tagsLayer = L.layerGroup().addTo(map);
+
+        // Map Click (Builder)
+        map.on('click', (e) => {
+          if (!isBuilderMode) return;
+          const pt = { x: Math.round(e.latlng.lng), y: Math.round(e.latlng.lat) };
+
+          currentLinePoints.push(pt);
+          renderBuilder();
+        });
+
+        // Right click to finish line
+        map.on('contextmenu', (e) => {
+          if (!isBuilderMode) return;
+          if (currentLinePoints.length > 1) {
+            drawnLines.push([...currentLinePoints]);
+          }
+          currentLinePoints = [];
+          renderBuilder();
+        });
+
+        // Fetch Data
+        await loadFloorsList();
+        connectWS();
+
+        // Periodic Anchor Refresh (every 30s to update Red/Green status)
+        setInterval(async () => {
+          if (currentFloor) {
+            await loadAnchors();
+            renderAnchors();
+          }
+        }, 30000);
+      }
+
+      // --- Builder Functions ---
+      function toggleBuilder() {
+        isBuilderMode = !isBuilderMode;
+        const panel = document.getElementById('builder-controls');
+        panel.style.display = isBuilderMode ? 'flex' : 'none';
+        document.getElementById('btn-builder').style.background = isBuilderMode ? 'var(--accent)' : '';
+        document.getElementById('btn-builder').style.color = isBuilderMode ? '#fff' : '';
+
+        if (isBuilderMode) {
+          renderBuilder();
+        } else {
+          builderLayer.clearLayers();
+        }
+      }
+
+      function clearLines() {
+        if (!confirm('Clear all lines?')) return;
+        drawnLines = [];
+        currentLinePoints = [];
+        renderBuilder();
+      }
+
+      async function saveLines() {
+        if (!currentFloor) return;
+
+        // Auto-finish current line if valid
+        if (currentLinePoints.length > 1) {
+          drawnLines.push([...currentLinePoints]);
+          currentLinePoints = [];
+          renderBuilder();
+        }
+
+        if (drawnLines.length === 0) {
+          alert("No lines to save! Draw a line and right-click to finish it.");
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_BASE}/map-lines`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              floorId: currentFloor.id,
+              lines: drawnLines
+            })
+          });
+          const j = await res.json();
+          alert(j.message);
+        } catch (e) {
+          alert('Error saving: ' + e);
+        }
+      }
+
+      async function loadMapLines(floorId) {
+        try {
+          const res = await fetch(`${API_BASE}/map-lines`);
+          const j = await res.json();
+          if (j.success && j.data && j.data[String(floorId)]) {
+            drawnLines = j.data[String(floorId)];
+          } else {
+            drawnLines = [];
+          }
+          currentLinePoints = [];
+          if (isBuilderMode) renderBuilder();
+        } catch (e) { console.error(e); }
+      }
+
+      function renderBuilder() {
+        builderLayer.clearLayers();
+
+        // Existing Lines
+        drawnLines.forEach(line => {
+          const latlngs = line.map(p => [p.y, p.x]);
+          L.polyline(latlngs, { color: '#339af0', weight: 4, opacity: 0.8 }).addTo(builderLayer);
+          latlngs.forEach(ll => L.circleMarker(ll, { radius: 3, color: '#339af0', fillColor: '#fff', fillOpacity: 1 }).addTo(builderLayer));
+        });
+
+        // Current Line
+        if (currentLinePoints.length > 0) {
+          const latlngs = currentLinePoints.map(p => [p.y, p.x]);
+          L.polyline(latlngs, { color: '#fcc419', weight: 4, opacity: 0.8, dashArray: '5, 10' }).addTo(builderLayer);
+          latlngs.forEach(ll => L.circleMarker(ll, { radius: 3, color: '#fcc419' }).addTo(builderLayer));
+        }
+      }
+
+      // --- WebSocket ---
+      function connectWS() {
+        const el = document.getElementById('connection-status');
+        el.textContent = '...';
+
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => { el.textContent = 'Online'; el.classList.add('connected'); };
+        ws.onclose = () => { el.textContent = 'Offline'; el.classList.remove('connected'); setTimeout(connectWS, 2000); };
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'mqtt_message' && msg.topic === 'rtls/position') {
+              handleTag(msg.data);
+            }
+          } catch (err) { }
+        };
+      }
+
+      function handleTag(pt) {
+        // pt = { id, floor, x, y, known: bool, semanticMode, semanticReason, ... }
+        if (!pt || !pt.id) return;
+        const id = pt.id;
+
+        if (!tags.has(id)) {
+          tags.set(id, { data: pt });
+          renderTagList();
+        } else {
+          const t = tags.get(id);
+          // Preserve some old data if needed, but overwrite the main fields
+          t.data = { ...t.data, ...pt };
+        }
+
+        updateTagMarker(id);
+        updateKPIs();
+      }
+
+      // --- Rendering ---
+      function renderAnchors() {
+        anchorsLayer.clearLayers();
+        const now = Date.now();
+        let ok = 0, ko = 0;
+
+        // Filter anchors for current floor
+        const floorAnchors = anchors.filter(a => String(a.floor_id) === String(currentFloor.id));
+
+        floorAnchors.forEach(a => {
+          // Status determined by 'onoff' field from DB (calculated by backend)
+          let isOk = !!a.onoff;
+
+          if (isOk) ok++; else ko++;
+
+          const color = isOk ? '#40c057' : '#fa5252';
+
+          const m = L.circleMarker([a.y, a.x], {
+            radius: 6,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.8
+          }).addTo(anchorsLayer);
+
+          m.bindTooltip(a.name || 'Sensor', {
+            permanent: true,
+            direction: 'right',
+            className: 'anchor-tooltip',
+            offset: [8, 0]
+          });
+
+          m.bindPopup(`
+              <div style="font-family: sans-serif; line-height: 1.4;">
+                <b style="font-size: 1.1em; color: ${color};">${a.name}</b><hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
+                <b>ID (MAC):</b> ${a.mac}<br>
+                <b>Étage:</b> ${a.floor_id}<br>
+                <b>Dernière Vue:</b> ${a.last_seen ? new Date(a.last_seen).toLocaleString() : 'Jamais'}<br>
+                <b>Intervalle (nbsec):</b> ${a.nbsec !== null ? a.nbsec + 's' : 'N/A'}<br>
+                <b>Statut (onoff):</b> <span style="color: ${color}; font-weight: bold;">${isOk ? 'ON' : 'OFF'}</span>
+              </div>
+            `);
+        });
+
+        // Update KPIs
+        document.getElementById('kpi-anchors-ok').textContent = ok;
+        document.getElementById('kpi-anchors-ko').textContent = ko;
+      }
+
+      function updateTagMarker(id) {
+        const t = tags.get(id);
+        if (!t) return;
+        const pt = t.data;
+
+        // Only show if on current floor
+        if (currentFloor && String(pt.floor) === String(currentFloor.id)) {
+          const color = pt.semanticMode === 'IN_ROOM' ? '#3fb950' : (pt.semanticMode === 'CORRIDOR' ? '#58a6ff' : (pt.known ? '#40c057' : '#fa5252'));
+          const latLng = [pt.y, pt.x];
+
+          if (!t.marker) {
+            t.marker = L.circleMarker(latLng, {
+              radius: 10,
+              color: '#fff',
+              weight: 3,
+              fillColor: color,
+              fillOpacity: 0.9
+            }).addTo(tagsLayer);
+          } else {
+            t.marker.setLatLng(latLng);
+            t.marker.setStyle({ fillColor: color });
+          }
+
+          // Update Popup with Semantic Info
+          const mode = pt.semanticMode || 'UNKNOWN';
+          const reason = pt.semanticReason || '—';
+          const statusText = pt.known ? 'Registered' : 'Unknown';
+
+          t.marker.bindPopup(`
+            <div style="font-family: sans-serif; min-width: 140px;">
+              <b style="font-size: 1.1em;">Tag: ${id}</b><br>
+              <span style="color: ${pt.known ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">${statusText}</span>
+              <hr style="margin: 6px 0; border: 0; border-top: 1px solid #333;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85em;">
+                <span style="color: #999;">Mode:</span>
+                <b style="color: #fff;">${mode}</b>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-top: 2px;">
+                <span style="color: #999;">Reason:</span>
+                <span style="color: #339af0;">${reason}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-top: 2px;">
+                <span style="color: #999;">Pos:</span>
+                <span style="color: #fff;">${pt.x}, ${pt.y}</span>
+              </div>
+            </div>
+          `, { className: 'tag-popup' });
+        } else {
+          if (t.marker) {
+            tagsLayer.removeLayer(t.marker);
+            t.marker = null;
+          }
+        }
+      }
+
+      function updateKPIs() {
+        let known = 0, unknown = 0;
+        // Count active tags (seen in last minute?) - Optional: Filter stale tags
+        const now = Date.now();
+        tags.forEach(t => {
+          // Optional: prune old tags?
+          if (t.data.known) known++; else unknown++;
+        });
+        document.getElementById('kpi-tags-known').textContent = known;
+        document.getElementById('kpi-tags-unknown').textContent = unknown;
+      }
+
+      function renderTagList() {
+        // Optional: List active tags
+        // To save performance, maybe just update KPIs and Map
+      }
+
+      // --- Loading ---
+      async function loadFloorsList() {
+        try {
+          const r = await fetch(`${API_BASE}/floors`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          if (j.success) {
+            floors = j.data;
+            const s = document.getElementById('floor-select');
+            s.innerHTML = '';
+            floors.forEach(f => {
+              const o = document.createElement('option');
+              o.value = f.id; o.textContent = f.name;
+              s.appendChild(o);
+            });
+
+            if (floors.length) loadFloor(floors[0].id);
+          }
+        } catch (e) { console.error('Load floors error:', e); }
+      }
+
+      async function loadFloor(id) {
+        const f = floors.find(x => String(x.id) === String(id));
+        if (!f) return;
+        currentFloor = f;
+        document.getElementById('floor-indicator').textContent = f.name;
+
+        // Load Lines
+        await loadMapLines(f.id);
+
+        // Map
+        const plan = f.plan || f.map_data;
+        if (plan) {
+          const url = (plan.startsWith('/') || plan.startsWith('http')) ? plan : '/' + plan;
+          try {
+            const r = await fetch(url);
+            if (r.ok) {
+              const g = await r.json();
+              floorLayer.clearLayers();
+              floorLayer.addData(g);
+              map.fitBounds(floorLayer.getBounds());
+            }
+          } catch (e) { }
+        }
+
+        // Reload anchors to be fresh
+        await loadAnchors();
+        renderAnchors();
+
+        // Room centroids (anchor_x, anchor_y)
+        await loadRoomCentroids();
+        renderRoomCentroids();
+
+        // Re-render tags for this floor
+        tags.forEach((v, k) => updateTagMarker(k));
+      }
+
+      async function loadAnchors() {
+        try {
+          const r = await fetch(`${API_BASE}/anchors`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          if (j.success) anchors = j.data;
+        } catch (e) { console.error('Load anchors error:', e); }
+      }
+
+      async function loadRoomCentroids() {
+        try {
+          const r = await fetch(`${API_BASE}/room-centroids`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          if (j.success) roomCentroids = j.data;
+        } catch (e) { console.error('Load room centroids error:', e); }
+      }
+
+      function renderRoomCentroids() {
+        roomCentroidsLayer.clearLayers();
+        if (!currentFloor) return;
+        const floorRooms = roomCentroids.filter(r => String(r.floor_id) === String(currentFloor.id));
+        floorRooms.forEach(r => {
+          const cx = parseFloat(r.anchor_x);
+          const cy = parseFloat(r.anchor_y);
+          if (isNaN(cx) || isNaN(cy)) return;
+
+          // Cross marker (orange diamond)
+          const m = L.circleMarker([cy, cx], {
+            radius: 8,
+            color: '#ff9f43',
+            fillColor: '#ff9f43',
+            fillOpacity: 0.6,
+            weight: 2
+          }).addTo(roomCentroidsLayer);
+
+          m.bindTooltip(r.name, {
+            permanent: true,
+            direction: 'bottom',
+            className: 'room-centroid-tooltip',
+            offset: [0, 8]
+          });
+        });
+      }
+
+      function toggleFullscreen() {
+        document.body.classList.toggle('fullscreen-mode');
+        setTimeout(() => {
+          map.invalidateSize(); // Leaflet needs to know container size changed
+        }, 300);
+      }
+
+      init();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,272 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_Bloc1",
+        "floor": 6,
+        "anchor_x": 667,
+        "anchor_y": 644,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              315,
+              808
+            ],
+            [
+              803,
+              800
+            ],
+            [
+              795,
+              264
+            ],
+            [
+              795,
+              260
+            ],
+            [
+              311,
+              280
+            ],
+            [
+              315,
+              808
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_bloc2",
+        "floor": 6,
+        "anchor_x": 1253,
+        "anchor_y": 747,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              833,
+              812
+            ],
+            [
+              1273,
+              794
+            ],
+            [
+              1261,
+              282
+            ],
+            [
+              811,
+              286
+            ],
+            [
+              833,
+              812
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_bloc3",
+        "floor": 6,
+        "anchor_x": 1742,
+        "anchor_y": 658,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1309,
+              812
+            ],
+            [
+              1769,
+              820
+            ],
+            [
+              1755,
+              280
+            ],
+            [
+              1283,
+              284
+            ],
+            [
+              1283,
+              284
+            ],
+            [
+              1309,
+              812
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_bloc4",
+        "floor": 6,
+        "anchor_x": 2476,
+        "anchor_y": 756,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1809,
+              824
+            ],
+            [
+              2251,
+              824
+            ],
+            [
+              2235,
+              266
+            ],
+            [
+              1799,
+              284
+            ],
+            [
+              1809,
+              824
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_bloc5",
+        "floor": 6,
+        "anchor_x": 3998,
+        "anchor_y": 639,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2998,
+              308
+            ],
+            [
+              2998,
+              832
+            ],
+            [
+              3498,
+              820
+            ],
+            [
+              3498,
+              288
+            ],
+            [
+              2998,
+              308
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_bloc6",
+        "floor": 6,
+        "anchor_x": 4684,
+        "anchor_y": 762,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              3530,
+              840
+            ],
+            [
+              4070,
+              816
+            ],
+            [
+              4062,
+              280
+            ],
+            [
+              3542,
+              272
+            ],
+            [
+              3530,
+              840
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "room_id": "F6_CH_REVEILLE",
+        "floor": 6,
+        "anchor_x": 1668,
+        "anchor_y": 1730,
+        "type": "rooms"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              859,
+              1628
+            ],
+            [
+              2046,
+              1640
+            ],
+            [
+              2030,
+              1012
+            ],
+            [
+              879,
+              1012
+            ],
+            [
+              859,
+              1628
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

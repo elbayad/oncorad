@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Air Quality Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: monospace;
+            padding: 20px;
+        }
+
+        .card {
+            background: #333;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 5px solid #a855f7;
+            /* Purple for Air Quality */
+        }
+
+        .log {
+            background: #000;
+            padding: 10px;
+            height: 150px;
+            overflow-y: scroll;
+            border: 1px solid #444;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 class="text-2xl mb-4 text-purple-400">Air Quality Monitor (Air)</h1>
+
+    <div id="status" class="mb-4 text-yellow-500">Connecting...</div>
+
+    <div class="mb-2">Activity Log (Raw)</div>
+    <div id="log" class="log"></div>
+
+    <div class="mb-2">Detected Air Sensors</div>
+    <div id="cards"></div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const cardsEl = document.getElementById('cards');
+        const statusEl = document.getElementById('status');
+        const PORT = 8789;
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.prepend(div);
+            // Limit to 50 lines
+            if (logEl.children.length > 50) logEl.lastChild.remove();
+        }
+
+        function wssConnect() {
+            let url;
+            const isSecure = window.location.protocol === 'https:';
+
+            if (isSecure) {
+                // In production HTTPS, we rely on the reverse proxy (Nginx/Traefik) to route /api/ to the backend
+                url = `wss://${window.location.host}/api/`;
+            } else {
+                // In development/local HTTP, we connect directly to the backend port
+                url = `ws://${window.location.hostname}:${PORT}`;
+            }
+
+            console.log('Connecting to', url);
+            const ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                statusEl.innerText = 'Connected';
+                statusEl.className = 'mb-4 text-green-500';
+                log('Connected to WebSocket');
+            };
+
+            ws.onclose = () => {
+                statusEl.innerText = 'Disconnected (Retrying...)';
+                statusEl.className = 'mb-4 text-red-500';
+                log('Disconnected');
+                setTimeout(wssConnect, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+
+                    if (msg.type === 'mqtt_message') {
+                        // Filter for Air topic
+                        // Topic: air/topic
+
+                        if (msg.topic === 'air/topic' || (msg.data && msg.data.topic === 'air/topic')) {
+                            console.log('Air Sensor Full Frame:', msg);
+                            updateCard(msg.data);
+                            log(`Rx Air Data from ${msg.data.deviceId || 'Unknown'}`);
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+        }
+
+        function updateCard(item) {
+            // Item structure: { deviceId, temperature, humidity, co2, pm25, tvoc, ... }
+            const id = item.deviceId || 'Unknown';
+            // Access data directly from item (as mapped by parseAirData in mqttService.js)
+            const data = item.data || item;
+
+            let card = document.getElementById(`card-${id}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `card-${id}`;
+                card.className = 'card';
+                cardsEl.prepend(card);
+            }
+
+            // CO2 Color Assessment
+            const co2 = data.co2 || 0;
+            let co2Color = 'text-green-400';
+            if (co2 > 1000) co2Color = 'text-yellow-400';
+            if (co2 > 2000) co2Color = 'text-red-400';
+
+            // TVOC Color Assessment
+            const tvoc = data.tvoc || 0;
+            let tvocColor = 'text-gray-300';
+            if (tvoc > 300) tvocColor = 'text-yellow-400';
+            if (tvoc > 500) tvocColor = 'text-red-400';
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <div class="font-bold text-lg text-white">Sensor: ${id}</div>
+                    <div class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</div>
+                </div>
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <!-- Environment -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">Environment</div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-xl text-white">${(data.temperature || 0).toFixed(1)}°C</span>
+                            <span class="text-blue-300">${(data.humidity || 0).toFixed(0)}%</span>
+                        </div>
+                    </div>
+
+                    <!-- CO2 -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">CO2 Level</div>
+                        <div class="text-xl font-mono ${co2Color}">
+                            ${co2} <span class="text-xs text-gray-500">ppm</span>
+                        </div>
+                    </div>
+
+                    <!-- Particles -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">PM 2.5 / 10</div>
+                        <div class="font-mono text-purple-300">
+                            ${(data.pm25 || 0)} / ${(data.pm10 || 0)} <span class="text-xs text-gray-500">µg/m³</span>
+                        </div>
+                    </div>
+                    
+                    <!-- VOC / Smoke -->
+                    <div class="bg-gray-800 p-2 rounded">
+                        <div class="text-gray-400 text-xs uppercase mb-1">TVOC</div>
+                        <div class="font-mono ${tvocColor}">
+                            ${tvoc} <span class="text-xs text-gray-500">ppb</span>
+                        </div>
+                         <div class="text-xs text-gray-500 mt-1">Smoke: ${data.smoke ? 'YES' : 'No'}</div>
+                    </div>
+                </div>
+                
+                <div class="mt-2 text-xs text-gray-500 font-mono">
+                    Pressure: ${data.pressure} hPa | Presence: ${data.human ? 'Yes' : 'No'}
+                </div>
+            `;
+
+            // Highlight interaction
+            card.style.backgroundColor = '#444';
+            setTimeout(() => card.style.backgroundColor = '#333', 200);
+        }
+
+        wssConnect();
+    </script>
+</body>
+
+</html>

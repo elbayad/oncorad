@@ -1,0 +1,15 @@
+{
+    "watch": [
+        "./"
+    ],
+    "ext": "js,mjs,json",
+    "ignore": [
+        "logs/*",
+        "data/*",
+        "node_modules",
+        "*.log",
+        "*.ndjson",
+        "../src/*"
+    ],
+    "exec": "node app.js"
+}

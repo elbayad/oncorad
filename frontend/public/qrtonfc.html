@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR to NFC - Oncorad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#111827',
+                            card: '#1F2937',
+                            text: '#F9FAFB'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 flex flex-col items-center">
+
+    <div class="w-full max-w-lg space-y-6 mt-8">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-3xl font-extrabold text-blue-500 mb-2">QR to NFC</h1>
+            <p class="text-gray-400">Scanner un QR Code et écrire une adresse MAC sur un tag NFC</p>
+        </div>
+
+        <!-- Status Card -->
+        <div class="bg-gray-900 p-4 rounded-xl border border-gray-800 shadow-lg flex justify-between items-center text-sm">
+            <div>
+                <span class="text-gray-500">Serveur local:</span> 
+                <span id="serverStatus" class="font-bold text-red-500">🔴 Déconnecté</span>
+            </div>
+            <div>
+                <span class="text-gray-500">Lecteurs:</span> 
+                <span id="readerStatus" class="font-bold text-red-500">🔴 Aucun</span>
+            </div>
+        </div>
+
+        <!-- Tag Read Card -->
+        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-4">
+            <h2 class="text-lg font-bold flex items-center gap-2">
+                <span class="p-1.5 bg-blue-900/30 text-blue-500 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                    </svg>
+                </span>
+                Lecture Tag NFC
+            </h2>
+            
+            <div id="tagInfo" class="space-y-2 text-sm">
+                <div class="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                    <span class="text-gray-500">UID:</span>
+                    <span id="tagUid" class="font-mono text-gray-300">N/A</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                    <span class="text-gray-500">Standard:</span>
+                    <span id="tagStandard" class="text-gray-300">N/A</span>
+                </div>
+                <div class="p-4 bg-blue-900/10 border border-blue-900/30 rounded-xl mt-4">
+                    <div class="text-[10px] text-blue-500 font-bold uppercase mb-1 tracking-wider">Record 1 (Extracted)</div>
+                    <div id="tagRecord" class="text-xl font-mono font-black text-blue-400">En attente...</div>
+                </div>
+            </div>
+
+            <div id="errorBanner" class="hidden p-3 bg-red-900/20 border border-red-900/30 text-red-400 text-xs rounded-lg animate-pulse"></div>
+        </div>
+
+        <!-- Write Section -->
+        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-xl space-y-6">
+            <div>
+                <h2 class="text-lg font-bold mb-4">Écrire Record Bluetooth</h2>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <input type="text" id="macInput" 
+                            class="w-full bg-gray-800 border-2 border-blue-900/50 rounded-xl px-4 py-4 text-center text-xl font-mono font-bold tracking-widest text-blue-400 focus:border-blue-500 outline-none transition-all placeholder-gray-700"
+                            placeholder="FB:26:84:39:EB:45">
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button id="scanBtn" class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition duration-200 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Scanner QR
+                </button>
+                <button id="writeBtn" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition duration-200 shadow-lg disabled:opacity-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Écrire sur Tag
+                </button>
+            </div>
+
+            <div id="writeStatus" class="hidden text-center font-bold text-sm py-2 rounded-lg"></div>
+        </div>
+
+        <p class="text-center text-xs text-gray-600">
+            Dossier d'enregistrement d'actifs Bluetooth • Oncorad Group
+        </p>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-900 rounded-3xl w-full max-w-sm overflow-hidden border border-gray-800">
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center">
+                <h3 class="text-xl font-bold">Scannez le QR Code</h3>
+                <button id="closeScannerBtn" class="p-2 hover:bg-gray-800 rounded-full text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div id="reader" class="w-full aspect-square rounded-2xl overflow-hidden bg-black border border-gray-800"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Socket
+        const socket = io('http://localhost:4000');
+
+        socket.on('connect', () => {
+            document.getElementById('serverStatus').textContent = '🟢 Connecté';
+            document.getElementById('serverStatus').classList.replace('text-red-500', 'text-green-500');
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('serverStatus').textContent = '🔴 Déconnecté';
+            document.getElementById('serverStatus').classList.replace('text-green-500', 'text-red-500');
+            document.getElementById('readerStatus').textContent = '🔴 Aucun';
+        });
+
+        socket.on('reader-status', (readers) => {
+            const statusEl = document.getElementById('readerStatus');
+            if (readers.length > 0) {
+                statusEl.textContent = `🟢 ${readers.join(', ')}`;
+                statusEl.classList.replace('text-red-500', 'text-green-500');
+            } else {
+                statusEl.textContent = '🔴 Aucun';
+                statusEl.classList.replace('text-green-500', 'text-red-500');
+            }
+        });
+
+        socket.on('tag-read', (data) => {
+            document.getElementById('tagUid').textContent = data.uid;
+            document.getElementById('tagStandard').textContent = data.standard;
+            document.getElementById('tagRecord').textContent = data.record1 || 'Pas de payload';
+            document.getElementById('errorBanner').classList.add('hidden');
+        });
+
+        socket.on('tag-error', (err) => {
+            const banner = document.getElementById('errorBanner');
+            banner.textContent = `⚠️ Erreur : ${err}`;
+            banner.classList.remove('hidden');
+        });
+
+        socket.on('write-success', (msg) => {
+            const status = document.getElementById('writeStatus');
+            status.textContent = `✅ ${msg}`;
+            status.className = "text-center font-bold text-sm py-2 rounded-lg block text-green-500 bg-green-950/20";
+            document.getElementById('writeBtn').disabled = false;
+            document.getElementById('writeBtn').innerHTML = 'Écrire sur Tag';
+        });
+
+        socket.on('write-error', (err) => {
+            const status = document.getElementById('writeStatus');
+            status.textContent = `❌ ${err}`;
+            status.className = "text-center font-bold text-sm py-2 rounded-lg block text-red-500 bg-red-950/20";
+            document.getElementById('writeBtn').disabled = false;
+            document.getElementById('writeBtn').innerHTML = 'Écrire sur Tag';
+        });
+
+        // Write Logic
+        document.getElementById('writeBtn').addEventListener('click', () => {
+            const mac = document.getElementById('macInput').value.trim();
+            if (!mac) return alert("Veuillez saisir une adresse MAC");
+            
+            document.getElementById('writeBtn').disabled = true;
+            document.getElementById('writeBtn').innerHTML = '<span class="animate-spin mr-2">⏳</span> Attente Badge...';
+            document.getElementById('writeStatus').textContent = '⏳ Approchez le badge du lecteur...';
+            document.getElementById('writeStatus').className = "text-center font-bold text-sm py-2 rounded-lg block text-blue-400 bg-blue-950/20";
+            document.getElementById('writeStatus').classList.remove('hidden');
+
+            socket.emit('write-tag-request', { type: 'bluetooth', mac: mac });
+        });
+
+        // QR Scanner Logic
+        let html5QrCode = null;
+        const modal = document.getElementById('scannerModal');
+
+        document.getElementById('scanBtn').addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                document.getElementById('macInput').value = decodedText.toUpperCase();
+                closeScanner();
+            }).catch(err => {
+                console.error(err);
+                closeScanner();
+            });
+        });
+
+        function closeScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    modal.classList.add('hidden');
+                });
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('closeScannerBtn').addEventListener('click', closeScanner);
+
+    </script>
+</body>
+</html>
